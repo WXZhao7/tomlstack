@@ -97,14 +97,14 @@ def _resolve_string(value: str, path: PathKey, state: _State) -> Any:
 def _parse_expr(expr: str, path: PathKey) -> tuple[PathKey, str | None]:
     ref, sep, fmt_spec = expr.partition(":")
     ref = ref.strip()
-    fmt_spec = fmt_spec if sep else None
+    fmt_spec_opt = fmt_spec if sep else None
     try:
         ref_path = parse_path_expr(ref)
     except ValueError as exc:
         raise InterpolationError(
             f"Invalid interpolation expression '{expr}' at {path_to_str(path)}: {exc}"
         ) from exc
-    return ref_path, fmt_spec
+    return ref_path, fmt_spec_opt
 
 
 def _resolve_reference(
