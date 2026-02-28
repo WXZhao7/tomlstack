@@ -13,7 +13,7 @@ It address two missing pieces to TOML: file composition and safe interpolation â
 ## Install
 
 ```bash
-uv sync
+pip install tomlstack
 ```
 
 ## Quick Start
@@ -133,3 +133,29 @@ Conflict behavior:
 
 - [ ] review the details of interpolation
 - [ ] explain history with interpolation
+
+## Release To PyPI
+
+Build package:
+
+```bash
+uv run --with build python -m build
+```
+
+Upload to TestPyPI first:
+
+```bash
+uv run --with twine python -m twine upload --repository testpypi dist/*
+```
+
+Verify install from TestPyPI:
+
+```bash
+python -m pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple tomlstack
+```
+
+Upload to PyPI:
+
+```bash
+uv run --with twine python -m twine upload dist/*
+```
