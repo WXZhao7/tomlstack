@@ -3,68 +3,69 @@ name: Publish PyPI
 on:
   push:
     tags:
-      - "v*"
+    - "v*"
 
 jobs:
   publish:
     if: ${{ !contains(github.ref_name, 'rc') }}
     runs-on: ubuntu-latest
+    environment: pypi
     permissions:
-      contents: write
+      contents: read
       id-token: write
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
 
-      - name: Install build and test tools
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install pytest build twine
+    - name: Install build and test tools
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install pytest build twine
 
-      - name: Run tests
-        run: python -m pytest -q
+    - name: Run tests
+      run: python -m pytest -q
 
-      - name: Build package
-        run: python -m build
+    - name: Build package
+      run: python -m build
 
-      - name: Check distribution metadata
-        run: python -m twine check dist/*
+    - name: Check distribution metadata
+      run: python -m twine check dist/*
 
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
 
-      - name: Generate changelog
-        id: changelog
-        run: |
-          if git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" >/dev/null 2>&1; then
-            PREV_TAG="$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^")"
-            {
-              echo "CHANGELOG<<EOF"
-              git log --pretty=format:'- %s (%h)' "${PREV_TAG}..${GITHUB_REF_NAME}"
-              echo
-              echo "EOF"
-            } >> "$GITHUB_OUTPUT"
-          else
-            {
-              echo "CHANGELOG<<EOF"
-              echo "Initial release ${GITHUB_REF_NAME}."
-              echo "EOF"
-            } >> "$GITHUB_OUTPUT"
-          fi
+    - name: Generate changelog
+      id: changelog
+      run: |
+        if git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" >/dev/null 2>&1; then
+          PREV_TAG="$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^")"
+          {
+            echo "CHANGELOG<<EOF"
+            git log --pretty=format:'- %s (%h)' "${PREV_TAG}..${GITHUB_REF_NAME}"
+            echo
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+        else
+          {
+            echo "CHANGELOG<<EOF"
+            echo "Initial release ${GITHUB_REF_NAME}."
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+        fi
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
-          body: ${{ steps.changelog.outputs.CHANGELOG }}
-          files: |
-            dist/*
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ github.ref_name }}
+        name: ${{ github.ref_name }}
+        body: ${{ steps.changelog.outputs.CHANGELOG }}
+        files: |
+          dist/*
