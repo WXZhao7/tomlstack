@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: ["main"]
+    branches: [ "main" ]
   pull_request:
-    branches: ["main"]
+    branches: [ "main" ]
 
 jobs:
   test-and-build:
@@ -12,34 +12,31 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12", "3.13", "3.x"]
+        python-version: [ "3.11", "3.12", "3.13", "3.14" ]
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    - name: Checkout
+      uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install pytest build ruff mypy
-          python -m pip install -e .
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install pytest build ruff mypy
+        python -m pip install -e .
 
-      - name: Lint
-        if: matrix.python-version == '3.11'
-        run: ruff check .
+    - name: Lint
+      run: ruff check .
 
-      - name: Type check
-        if: matrix.python-version == '3.11'
-        run: mypy
+    - name: Type check
+      run: mypy
 
-      - name: Run tests
-        run: python -m pytest -q
+    - name: Run tests
+      run: python -m pytest -q
 
-      - name: Build package
-        if: matrix.python-version == '3.11'
-        run: python -m build
+    - name: Build package
+      run: python -m build
