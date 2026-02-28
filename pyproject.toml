@@ -7,7 +7,7 @@ packages = ["src/tomlstack"]
 
 [project]
 name = "tomlstack"
-version = "0.1.0"
+version = "0.1.1rc1"
 description = "TOML configuration loader with include/merge/interpolation"
 readme = "README.md"
 requires-python = ">=3.11"
