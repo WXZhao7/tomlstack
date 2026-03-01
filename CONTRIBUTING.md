@@ -6,7 +6,7 @@
 2. Install dev dependencies:
 
 ```bash
-uv sync --group dev
+python -m pip install -e ".[dev]"
 ```
 
 ## Local quality checks
@@ -50,9 +50,11 @@ uv run mypy
 
 ## Release flow
 
-1. Bump version in `pyproject.toml`.
+1. Ensure `CHANGELOG.md` is up to date.
 2. For release candidate, create tag like `v0.1.1rc1` and push.
 3. For final release, create tag like `v0.1.1` and push.
 4. CI workflows will run tests/build and publish automatically.
+
+Version is derived from git tags via `hatch-vcs` (do not edit version manually in `pyproject.toml`).
 
 See `RELEASE.md` for full publishing details.

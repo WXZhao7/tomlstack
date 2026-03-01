@@ -155,3 +155,5 @@ cython_debug/
 # custom
 
 .vscode/*
+# hatch-vcs generated version file
+src/tomlstack/_version.py

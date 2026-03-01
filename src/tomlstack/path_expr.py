@@ -35,7 +35,9 @@ def parse_path_expr(expr: str) -> PathKey:
                 raise ValueError(f"Unclosed list index in path '{expr}'")
             idx_token = expr[idx_start:i]
             if not idx_token.isdigit():
-                raise ValueError(f"List index must be non-negative integer in path '{expr}'")
+                raise ValueError(
+                    f"List index must be non-negative integer in path '{expr}'"
+                )
             tokens.append(int(idx_token))
             i += 1
 

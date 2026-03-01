@@ -1,6 +1,6 @@
 # Release Guide
 
-This project uses `hatchling` via `pyproject.toml`.
+This project uses `hatchling` + `hatch-vcs` via `pyproject.toml`.
 
 ## GitHub Actions automation
 
@@ -23,13 +23,16 @@ For publishing workflows in this repo, configure PyPI and TestPyPI Trusted Publi
   - PyPI: `.github/workflows/publish-pypi.yml`
 - Environment name: leave empty (not used by workflows)
 
-## 1) Bump version
+## 1) Create release tag
 
-Edit `[project].version` in `pyproject.toml`:
+Version is derived from git tags (`hatch-vcs`), not hardcoded in `pyproject.toml`.
 
-```toml
-[project]
-version = "0.1.1"
+- Release candidate: `vX.Y.ZrcN` (example: `v0.1.1rc1`)
+- Final release: `vX.Y.Z` (example: `v0.1.1`)
+
+```bash
+git tag v0.1.1rc1
+git push origin v0.1.1rc1
 ```
 
 ## 2) Clean old artifacts
@@ -69,7 +72,7 @@ python -c "import tomlstack; print(tomlstack.__all__)"
 uv run --with twine python -m twine upload dist/*
 ```
 
-## 8) (Optional) Create git tag
+## 8) Final release tag
 
 ```bash
 git tag v0.1.1
