@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on Keep a Changelog,
 and this project follows Semantic Versioning.
 
+
+## [0.1.1rc3] - 2026-03-01
+
+- try to fix OIDC
+
 ## [0.1.1rc2] - 2026-03-01
 
 ### Added
