@@ -27,16 +27,19 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-test = [
+test = ["pytest>=8.3", "pytest-cov>=5.0"]
+lint = ["ruff>=0.8"]
+typing = ["mypy>=1.11"]
+dev = [
     "pytest>=8.3",
     "pytest-cov>=5.0",
-]
-lint = [
     "ruff>=0.8",
-]
-typing = [
     "mypy>=1.11",
+    "build>=1.2",
+    "twine>=5.1",
 ]
+
+[dependency-groups]
 dev = [
     "pytest>=8.3",
     "pytest-cov>=5.0",

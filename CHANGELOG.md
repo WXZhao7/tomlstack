@@ -5,6 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on Keep a Changelog,
 and this project follows Semantic Versioning.
 
+## [0.1.2] - 2026-03-01
+
+- first publish version
 
 ## [0.1.1rc3] - 2026-03-01
 

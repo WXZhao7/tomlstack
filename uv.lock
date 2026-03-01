@@ -868,6 +868,16 @@ typing = [
     { name = "mypy" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "build" },
+    { name = "mypy" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "ruff" },
+    { name = "twine" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "build", marker = "extra == 'dev'", specifier = ">=1.2" },
@@ -882,6 +892,16 @@ requires-dist = [
     { name = "twine", marker = "extra == 'dev'", specifier = ">=5.1" },
 ]
 provides-extras = ["dev", "lint", "test", "typing"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "build", specifier = ">=1.2" },
+    { name = "mypy", specifier = ">=1.11" },
+    { name = "pytest", specifier = ">=8.3" },
+    { name = "pytest-cov", specifier = ">=5.0" },
+    { name = "ruff", specifier = ">=0.8" },
+    { name = "twine", specifier = ">=5.1" },
+]
 
 [[package]]
 name = "twine"
