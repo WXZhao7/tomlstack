@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from .loader import PathKey
+from .base import PathKey
 
 # [int]
 PURE_INDEX_RE = re.compile(r"\[(\d+)\]")
@@ -97,20 +97,6 @@ def parse_path_expr(expr: str) -> PathKey:
     return parse_path_expr_match(expr)
 
 
-def get_by_path(data: Any, path: PathKey) -> Any:
-    cur = data
-    for part in path:
-        if isinstance(part, str):
-            if not isinstance(cur, dict) or part not in cur:
-                raise KeyError(part)
-            cur = cur[part]
-        else:
-            if not isinstance(cur, list) or part < 0 or part >= len(cur):
-                raise KeyError(part)
-            cur = cur[part]
-    return cur
-
-
 def format_path_expr(path: PathKey) -> str:
     """
     Format a path expression as a string.
@@ -138,3 +124,21 @@ def format_path_expr(path: PathKey) -> str:
         else:
             out += f"[{part}]"
     return out
+
+
+def get_by_path(data: Any, path: PathKey) -> Any:
+    current = data
+    passed: list[str | int] = []
+    for part in path:
+        passed.append(part)
+        if isinstance(part, str):
+            if not isinstance(current, dict) or part not in current:
+                raise KeyError(f"Can't extract {passed!r}")
+            current = current[part]
+        elif isinstance(part, int):
+            if not isinstance(current, list) or part < 0 or part >= len(current):
+                raise KeyError(f"Can't extract {passed!r}")
+            current = current[part]
+        else:
+            raise TypeError(f"Invalid path {passed!r}")
+    return current
