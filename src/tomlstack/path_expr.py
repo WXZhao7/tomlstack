@@ -1,11 +1,39 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from .loader import PathKey
 
+# [int]
+PURE_INDEX_RE = re.compile(r"\[(\d+)\]")
+# str, str[int], str[int][int], ...
+VALID_SEGMENT_RE = re.compile(r"([^\[\]]+)((?:\[\d+\])*)$")
 
-def parse_path_expr(expr: str) -> PathKey:
+
+def parse_path_expr_match(expr: str) -> PathKey:
+    expr = expr.strip()
+    if not expr:
+        raise ValueError("Empty interpolation path")
+
+    tokens: list[str | int] = []
+    segments = expr.split(".")
+    if any(not segment for segment in segments):
+        raise ValueError(f"Invalid empty key in path '{expr}'")
+
+    for segment in segments:
+        match = VALID_SEGMENT_RE.fullmatch(segment)
+        if match is None:
+            raise ValueError(f"Invalid path segment '{segment}' in path '{expr}'")
+
+        key, indexes = match.groups()
+        tokens.append(key)
+        tokens.extend(int(index) for index in PURE_INDEX_RE.findall(indexes))
+
+    return tuple(tokens)
+
+
+def parse_path_expr_scan(expr: str) -> PathKey:
     expr = expr.strip()
     if not expr:
         raise ValueError("Empty interpolation path")
@@ -49,6 +77,26 @@ def parse_path_expr(expr: str) -> PathKey:
     return tuple(tokens)
 
 
+def parse_path_expr(expr: str) -> PathKey:
+    """
+    Parse a path expression into a tuple of keys.
+
+    Examples:
+        "" -> ValueError
+        "foo" -> ("foo",)
+        "foo.bar" -> ("foo", "bar")
+        "foo[0]" -> ("foo", 0)
+        "foo.bar[1].baz" -> ("foo", "bar", 1, "baz")
+        "foo[0][1]" -> ("foo", 0, 1)
+
+    :param expr: The path expression to parse
+    :type expr: str
+    :return: The parsed path
+    :rtype: PathKey
+    """
+    return parse_path_expr_match(expr)
+
+
 def get_by_path(data: Any, path: PathKey) -> Any:
     cur = data
     for part in path:
@@ -63,7 +111,21 @@ def get_by_path(data: Any, path: PathKey) -> Any:
     return cur
 
 
-def path_to_str(path: PathKey) -> str:
+def format_path_expr(path: PathKey) -> str:
+    """
+    Format a path expression as a string.
+
+    Examples:
+        () -> "<root>"
+        ("foo",) -> "foo"
+        ("foo", 0, 1) -> "foo[0][1]"
+        ("foo", 0, 1, "bar") -> "foo[0][1].bar"
+
+    :param path: The path to format
+    :type path: PathKey
+    :return: The formatted path string
+    :rtype: str
+    """
     if not path:
         return "<root>"
 
