@@ -13,20 +13,20 @@ from .path_expr import get_by_path
 
 @dataclass
 class TomlStack:
-    _raw_data: dict[str, Any]
+    _merged_data: dict[str, Any]
     _resolved_data: dict[str, Any] | None
     _history: dict[PathKey, list[TomlHist]]
 
     @property
     def view(self) -> dict[str, Any]:
         if self._resolved_data is None:
-            return self._raw_data
+            return self._merged_data
         else:
             return self._resolved_data
 
     def resolve(self) -> TomlStack:
         if self._resolved_data is None:
-            self._resolved_data = resolve_interpolations(self._raw_data)
+            self._resolved_data = resolve_interpolations(self._merged_data)
         return self
 
     def to_dict(self, resolve: bool = True) -> dict[str, Any]:
@@ -35,18 +35,18 @@ class TomlStack:
                 self.resolve()
             assert self._resolved_data is not None
             return self._resolved_data
-        return self._raw_data
+        return self._merged_data
 
     def to_toml(self) -> str:
         raise NotImplementedError("to_toml is reserved for future implementation")
 
     def __getitem__(self, key: str) -> Node:
-        if key not in self._raw_data:
+        if key not in self._merged_data:
             raise KeyError(key)
         return Node(self, (key,))
 
     def _get_raw(self, path: PathKey) -> Any:
-        return get_by_path(self._raw_data, path)
+        return get_by_path(self._merged_data, path)
 
     def _get_value(self, path: PathKey) -> Any:
         if self._resolved_data is None:
@@ -76,5 +76,5 @@ class TomlStack:
 def load(path: str | PathLike[str]) -> TomlStack:
     result: LoadResult = load_toml_with_includes(path)
     return TomlStack(
-        _raw_data=result.data, _resolved_data=None, _history=result.history
+        _merged_data=result.data, _resolved_data=None, _history=result.history
     )
