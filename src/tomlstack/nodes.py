@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from .base import PathHist
+from .base import TomlHist
 from .loader import PathKey
 
 
@@ -29,11 +29,11 @@ class Node:
         return self.value
 
     @property
-    def origin(self) -> PathHist:
+    def origin(self) -> TomlHist:
         return self._cfg._history[self.key][-1]
 
     @property
-    def history(self) -> tuple[PathHist, ...]:
+    def history(self) -> tuple[TomlHist, ...]:
         return tuple(self._cfg._history[self.key])
 
     def preview(self) -> str:
@@ -63,7 +63,7 @@ class Node:
 
 
 class ConfigProtocol(Protocol):
-    _history: dict[PathKey, list[PathHist]]
+    _history: dict[PathKey, list[TomlHist]]
 
     def _get_raw(self, path: PathKey) -> Any: ...
 

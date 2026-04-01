@@ -9,21 +9,19 @@ SUPPORTED_VERSIONS = {1}
 
 
 @dataclass(frozen=True, slots=True)
-class PathRec:
-    raw: str  # original path
+class TomlFile:
+    str_: str  # original path
     path: Path  # resolved absolute path
 
 
 @dataclass(frozen=True, slots=True)
-class PathHist:
-    raw: str
-    path: Path
+class TomlHist:
+    file: TomlFile
     depth: int
 
 
 @dataclass(frozen=True, slots=True)
-class RawToml:
-    path: Path
-    meta: dict[str, Any]
-    body: dict[str, Any]
+class TomlModel:
+    metadata: dict[str, Any]
     includes: list[str]
+    data: dict[str, Any]

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
+from os import PathLike
 from typing import Any
 
-from .base import PathHist, PathKey
+from .base import PathKey, TomlHist
 from .interpolate import resolve_interpolations
 from .loader import LoadResult, load_toml_with_includes
 from .nodes import Node
@@ -15,9 +15,8 @@ from .path_expr import get_by_path
 class TomlStack:
     _raw_data: dict[str, Any]
     _resolved_data: dict[str, Any] | None
-    _history: dict[PathKey, list[PathHist]]
+    _history: dict[PathKey, list[TomlHist]]
 
-    # TODO: OK?
     @property
     def view(self) -> dict[str, Any]:
         if self._resolved_data is None:
@@ -74,8 +73,8 @@ class TomlStack:
     #    └─ @root/base.toml -> /abs/shared/base.toml
 
 
-def load(path: str | Path) -> TomlStack:
-    result: LoadResult = load_toml_with_includes(Path(path))
+def load(path: str | PathLike[str]) -> TomlStack:
+    result: LoadResult = load_toml_with_includes(path)
     return TomlStack(
         _raw_data=result.data, _resolved_data=None, _history=result.history
     )
