@@ -1,20 +1,24 @@
-class TomlConfError(Exception):
+class TomlStackError(Exception):
     """Base error for tomlconf."""
 
 
-class ContentError(TomlConfError):
+class DataPathError(TomlStackError):
+    """Raised when path parsing or resolution fails."""
+
+
+class ContentError(TomlStackError):
     """Raised when content validation fails."""
 
 
-class MetaError(TomlConfError):
+class MetaError(TomlStackError):
     """Base error for meta errors."""
 
 
-class IncludeError(TomlConfError):
+class IncludeError(TomlStackError):
     """Raised when include resolution fails."""
 
 
-class TomlFormatError(TomlConfError):
+class TomlFormatError(TomlStackError):
     """Raised when TOML parsing fails."""
 
 
@@ -30,11 +34,11 @@ class IncludeCycleError(IncludeError):
     """Raised when include cycle is detected."""
 
 
-class MergeError(TomlConfError):
+class MergeError(TomlStackError):
     """Raised when merge process fails."""
 
 
-class InterpolationError(TomlConfError):
+class InterpolationError(TomlStackError):
     """Raised when interpolation fails."""
 
 
