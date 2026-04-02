@@ -135,6 +135,9 @@ venv.bak/
 .dmypy.json
 dmypy.json
 
+# ruff
+.ruff_cache/
+
 # Pyre type checker
 .pyre/
 
@@ -153,7 +156,7 @@ cython_debug/
 
 
 # custom
-
+.codex
 .vscode/*
 # hatch-vcs generated version file
 src/tomlstack/_version.py
