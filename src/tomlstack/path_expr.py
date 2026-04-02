@@ -3,7 +3,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from .types import PathKey
+from .errors import DataPathError
+from .types import ROOT_PATH, DataPath
 
 # [int]
 PURE_INDEX_RE = re.compile(r"\[(\d+)\]")
@@ -11,20 +12,23 @@ PURE_INDEX_RE = re.compile(r"\[(\d+)\]")
 VALID_SEGMENT_RE = re.compile(r"([^\[\]]+)((?:\[\d+\])*)$")
 
 
-def parse_path_expr_match(expr: str) -> PathKey:
-    expr = expr.strip()
+def parse_path_expr_match(expr: str) -> DataPath:
+
     if not expr:
-        raise ValueError("Empty interpolation path")
+        raise DataPathError("Empty interpolation path")
+
+    if any(c.isspace() for c in expr):
+        raise DataPathError(f"Path expression cannot contain whitespace: {expr!r}")
 
     tokens: list[str | int] = []
     segments = expr.split(".")
     if any(not segment for segment in segments):
-        raise ValueError(f"Invalid empty key in path '{expr}'")
+        raise DataPathError(f"Invalid empty key in path {expr!r}")
 
     for segment in segments:
         match = VALID_SEGMENT_RE.fullmatch(segment)
         if match is None:
-            raise ValueError(f"Invalid path segment '{segment}' in path '{expr}'")
+            raise DataPathError(f"Invalid path segment {segment!r} in path {expr!r}")
 
         key, indexes = match.groups()
         tokens.append(key)
@@ -33,10 +37,12 @@ def parse_path_expr_match(expr: str) -> PathKey:
     return tuple(tokens)
 
 
-def parse_path_expr_scan(expr: str) -> PathKey:
-    expr = expr.strip()
+def parse_path_expr_scan(expr: str) -> DataPath:
     if not expr:
-        raise ValueError("Empty interpolation path")
+        raise DataPathError("Empty interpolation path")
+
+    if any(c.isspace() for c in expr):
+        raise DataPathError(f"Path expression cannot contain whitespace: {expr!r}")
 
     tokens: list[str | int] = []
     i = 0
@@ -44,14 +50,14 @@ def parse_path_expr_scan(expr: str) -> PathKey:
 
     while i < n:
         if expr[i] in ".]":
-            raise ValueError(f"Invalid token at position {i} in path '{expr}'")
+            raise DataPathError(f"Invalid token at position {i} in path {expr!r}")
 
         start = i
         while i < n and expr[i] not in ".[":
             i += 1
         key = expr[start:i]
         if not key:
-            raise ValueError(f"Invalid empty key in path '{expr}'")
+            raise DataPathError(f"Invalid empty key in path {expr!r}")
         tokens.append(key)
 
         while i < n and expr[i] == "[":
@@ -60,29 +66,29 @@ def parse_path_expr_scan(expr: str) -> PathKey:
             while i < n and expr[i] != "]":
                 i += 1
             if i >= n or expr[i] != "]":
-                raise ValueError(f"Unclosed list index in path '{expr}'")
+                raise DataPathError(f"Unclosed list index in path {expr!r}")
             idx_token = expr[idx_start:i]
             if not idx_token.isdigit():
-                raise ValueError(
-                    f"List index must be non-negative integer in path '{expr}'"
+                raise DataPathError(
+                    f"List index must be non-negative integer in path {expr!r}"
                 )
             tokens.append(int(idx_token))
             i += 1
 
         if i < n:
             if expr[i] != ".":
-                raise ValueError(f"Unexpected token '{expr[i]}' in path '{expr}'")
+                raise DataPathError(f"Unexpected token '{expr[i]}' in path {expr!r}")
             i += 1
 
     return tuple(tokens)
 
 
-def parse_path_expr(expr: str) -> PathKey:
+def parse_path_expr(expr: str) -> DataPath:
     """
     Parse a path expression into a tuple of keys.
 
     Examples:
-        "" -> ValueError
+        "" -> DataPathError
         "foo" -> ("foo",)
         "foo.bar" -> ("foo", "bar")
         "foo[0]" -> ("foo", 0)
@@ -97,7 +103,7 @@ def parse_path_expr(expr: str) -> PathKey:
     return parse_path_expr_match(expr)
 
 
-def format_path_expr(path: PathKey) -> str:
+def format_path_expr(path: DataPath) -> str:
     """
     Format a path expression as a string.
 
@@ -112,7 +118,7 @@ def format_path_expr(path: PathKey) -> str:
     :return: The formatted path string
     :rtype: str
     """
-    if not path:
+    if path == ROOT_PATH:
         return "<root>"
 
     out = ""
@@ -126,19 +132,28 @@ def format_path_expr(path: PathKey) -> str:
     return out
 
 
-def get_by_path(data: Any, path: PathKey) -> Any:
-    current = data
-    passed: list[str | int] = []
+def get_by_path(data: Any, path: DataPath) -> Any:
+    cur_data = data
+    cur_path = []
     for part in path:
-        passed.append(part)
+        cur_path.append(part)
         if isinstance(part, str):
-            if not isinstance(current, dict) or part not in current:
-                raise KeyError(f"Can't extract {passed!r}")
-            current = current[part]
+            if not isinstance(cur_data, dict) or part not in cur_data:
+                raise DataPathError(
+                    f"Key {part!r} not found when accessing "
+                    f"{format_path_expr(tuple(cur_path))!r}"
+                )
+            cur_data = cur_data[part]
         elif isinstance(part, int):
-            if not isinstance(current, list) or part < 0 or part >= len(current):
-                raise KeyError(f"Can't extract {passed!r}")
-            current = current[part]
+            if not isinstance(cur_data, list) or part < 0 or part >= len(cur_data):
+                raise DataPathError(
+                    f"Index {part!r} out of bounds "
+                    f"when accessing {format_path_expr(tuple(cur_path))!r}"
+                )
+            cur_data = cur_data[part]
         else:
-            raise TypeError(f"Invalid path {passed!r}")
-    return current
+            raise TypeError(
+                f"Invalid path part {part!r} "
+                f"when accessing {format_path_expr(tuple(cur_path))!r}"
+            )
+    return cur_data
