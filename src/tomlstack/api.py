@@ -4,11 +4,11 @@ from dataclasses import dataclass
 from os import PathLike
 from typing import Any
 
-from .base import PathKey, TomlHist
 from .interpolate import resolve_interpolations
 from .loader import LoadResult, load_toml_with_includes
 from .nodes import Node
 from .path_expr import get_by_path
+from .types import PathKey, TomlHist
 
 
 @dataclass

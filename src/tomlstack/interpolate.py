@@ -5,13 +5,13 @@ from dataclasses import dataclass
 from datetime import date, datetime, time
 from typing import Any
 
-from .base import ROOT_PATH, PathKey
 from .errors import (
     InterpolationCycleError,
     InterpolationError,
     InterpolationUndefinedError,
 )
 from .path_expr import format_path_expr, get_by_path, parse_path_expr
+from .types import ROOT_PATH, PathKey
 
 EXPR_RE = re.compile(r"\$\{([^{}]+)\}")
 ALLOWED_EMBED_TYPES = (str, int, float, date, time, datetime)

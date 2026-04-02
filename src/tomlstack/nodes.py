@@ -3,8 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from .base import TomlHist
-from .loader import PathKey
+from .types import PathKey, TomlHist
 
 
 @dataclass

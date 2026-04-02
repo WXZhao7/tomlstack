@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 PathKey = tuple[str | int, ...]
+
+ROOT_PATH: PathKey = ()
 
 UNDECLARED_VERSION = 0
 SUPPORTED_VERSIONS = {1}
@@ -18,10 +19,3 @@ class TomlFile:
 class TomlHist:
     file: TomlFile
     depth: int
-
-
-@dataclass(frozen=True, slots=True)
-class TomlModel:
-    metadata: dict[str, Any]
-    includes: list[str]
-    data: dict[str, Any]

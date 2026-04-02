@@ -8,7 +8,9 @@ from os import PathLike
 from pathlib import Path
 from typing import Any
 
-from .base import (
+from .errors import ContentError, IncludeCycleError, VersionError
+from .include import IncludeSpec
+from .types import (
     ROOT_PATH,
     SUPPORTED_VERSIONS,
     UNDECLARED_VERSION,
@@ -16,8 +18,6 @@ from .base import (
     TomlFile,
     TomlHist,
 )
-from .errors import ContentError, IncludeCycleError, VersionError
-from .include import IncludeSpec
 
 
 @dataclass(frozen=True, slots=True)

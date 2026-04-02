@@ -20,8 +20,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Self
 
-from .base import TomlFile
 from .errors import IncludeError
+from .types import TomlFile
 
 
 @dataclass

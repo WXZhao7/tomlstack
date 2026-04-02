@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from .base import PathKey
+from .types import PathKey
 
 # [int]
 PURE_INDEX_RE = re.compile(r"\[(\d+)\]")
