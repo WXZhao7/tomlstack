@@ -9,18 +9,22 @@ from pathlib import Path
 from typing import Any
 
 from .base import (
+    ROOT_PATH,
     SUPPORTED_VERSIONS,
     UNDECLARED_VERSION,
     PathKey,
     TomlFile,
     TomlHist,
-    TomlModel,
 )
 from .errors import ContentError, IncludeCycleError, VersionError
 from .include import IncludeSpec
 
-INTERNAL_FIELDS = {"include", "__meta__"}
-ROOT_HISTORY_KEY: PathKey = ()
+
+@dataclass(frozen=True, slots=True)
+class ParsedToml:
+    metadata: dict[str, Any]
+    includes: list[str]
+    data: dict[str, Any]
 
 
 @dataclass
@@ -147,7 +151,7 @@ def record_history(data: Any, hist: TomlHist):
             for idx, child in enumerate(value):
                 walk(child, (*path, idx))
 
-    walk(data, ROOT_HISTORY_KEY)
+    walk(data, ROOT_PATH)
     return history
 
 
@@ -175,7 +179,7 @@ def merge_history(
     return merged
 
 
-def parse_raw_file(path: Path) -> TomlModel:
+def parse_raw_file(path: Path) -> ParsedToml:
     with path.open("rb") as f:
         data = tomllib.load(f)
 
@@ -200,4 +204,4 @@ def parse_raw_file(path: Path) -> TomlModel:
     else:
         raise ContentError(f"Invalid include specification in {path}")
 
-    return TomlModel(metadata=metadata, includes=includes, data=data)
+    return ParsedToml(metadata=metadata, includes=includes, data=data)
