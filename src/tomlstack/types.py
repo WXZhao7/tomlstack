@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-PathKey = tuple[str | int, ...]
+DataPath = tuple[str | int, ...]
 
-ROOT_PATH: PathKey = ()
+ROOT_PATH: DataPath = ()
 
 UNDECLARED_VERSION = 0
 SUPPORTED_VERSIONS = {1}

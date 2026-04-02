@@ -8,14 +8,14 @@ from .interpolate import resolve_interpolations
 from .loader import LoadResult, load_toml_with_includes
 from .nodes import Node
 from .path_expr import get_by_path
-from .types import PathKey, TomlHist
+from .types import DataPath, TomlHist
 
 
 @dataclass
 class TomlStack:
     _merged_data: dict[str, Any]
     _resolved_data: dict[str, Any] | None
-    _history: dict[PathKey, list[TomlHist]]
+    _history: dict[DataPath, list[TomlHist]]
 
     @property
     def view(self) -> dict[str, Any]:
@@ -45,10 +45,10 @@ class TomlStack:
             raise KeyError(key)
         return Node(self, (key,))
 
-    def _get_raw(self, path: PathKey) -> Any:
+    def _get_raw(self, path: DataPath) -> Any:
         return get_by_path(self._merged_data, path)
 
-    def _get_value(self, path: PathKey) -> Any:
+    def _get_value(self, path: DataPath) -> Any:
         if self._resolved_data is None:
             self.resolve()
         assert self._resolved_data is not None

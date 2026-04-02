@@ -3,13 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from .types import PathKey, TomlHist
+from .types import DataPath, TomlHist
 
 
 @dataclass
 class Node:
     _cfg: ConfigProtocol
-    key: PathKey
+    key: DataPath
 
     def __post_init__(self) -> None:
         if self.key not in self._cfg._history:
@@ -62,11 +62,11 @@ class Node:
 
 
 class ConfigProtocol(Protocol):
-    _history: dict[PathKey, list[TomlHist]]
+    _history: dict[DataPath, list[TomlHist]]
 
-    def _get_raw(self, path: PathKey) -> Any: ...
+    def _get_raw(self, path: DataPath) -> Any: ...
 
-    def _get_value(self, path: PathKey) -> Any: ...
+    def _get_value(self, path: DataPath) -> Any: ...
 
 
 def _render_preview(value: Any, indent: int = 0) -> str:

@@ -14,7 +14,7 @@ from .types import (
     ROOT_PATH,
     SUPPORTED_VERSIONS,
     UNDECLARED_VERSION,
-    PathKey,
+    DataPath,
     TomlFile,
     TomlHist,
 )
@@ -30,7 +30,7 @@ class ParsedToml:
 @dataclass
 class LoadResult:
     data: dict[str, Any]
-    history: dict[PathKey, list[TomlHist]]
+    history: dict[DataPath, list[TomlHist]]
 
 
 @dataclass
@@ -126,7 +126,7 @@ def _load_file(entry: TomlFile, ctx: _LoadContext) -> LoadResult:
         include_spec = IncludeSpec.from_toml(entry, toml.metadata)
         if toml.includes:
             merged_data: dict[str, Any] = {}
-            merged_history: dict[PathKey, list[TomlHist]] = {}
+            merged_history: dict[DataPath, list[TomlHist]] = {}
             for raw_path in toml.includes:
                 abs_path = include_spec.resolve_include_path(raw_path)
                 included = _load_file(TomlFile(str_=raw_path, path=abs_path), ctx)
@@ -140,9 +140,9 @@ def _load_file(entry: TomlFile, ctx: _LoadContext) -> LoadResult:
 
 
 def record_history(data: Any, hist: TomlHist):
-    history: dict[PathKey, list[TomlHist]] = {}
+    history: dict[DataPath, list[TomlHist]] = {}
 
-    def walk(value: Any, path: PathKey) -> None:
+    def walk(value: Any, path: DataPath) -> None:
         history.setdefault(path, []).append(hist)
         if isinstance(value, dict):
             for key, child in value.items():
@@ -171,8 +171,8 @@ def merge_data(low: dict[str, Any], high: dict[str, Any]) -> dict[str, Any]:
 
 
 def merge_history(
-    low: dict[PathKey, list[TomlHist]], high: dict[PathKey, list[TomlHist]]
-) -> dict[PathKey, list[TomlHist]]:
+    low: dict[DataPath, list[TomlHist]], high: dict[DataPath, list[TomlHist]]
+) -> dict[DataPath, list[TomlHist]]:
     merged = {path: entries[:] for path, entries in low.items()}  # !!! important?
     for path, entries in high.items():
         merged.setdefault(path, []).extend(entries)
