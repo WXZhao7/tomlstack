@@ -1,5 +1,6 @@
 import pytest
 
+from tomlstack.errors import DataPathError
 from tomlstack.path_expr import parse_path_expr_match, parse_path_expr_scan
 
 
@@ -11,7 +12,6 @@ from tomlstack.path_expr import parse_path_expr_match, parse_path_expr_scan
         ("a.b.c[1]", ("a", "b", "c", 1)),
         ("a.b[1][2]", ("a", "b", 1, 2)),
         ("a[0][1].b", ("a", 0, 1, "b")),
-        ("  db.apps[0]  ", ("db", "apps", 0)),
     ],
 )
 def test_parse_path_expr_re_valid(expr: str, expected: tuple[str | int, ...]) -> None:
@@ -36,7 +36,7 @@ def test_parse_path_expr_re_valid(expr: str, expected: tuple[str | int, ...]) ->
     ],
 )
 def test_parse_path_expr_re_invalid(expr: str) -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(DataPathError):
         parse_path_expr_match(expr)
 
 

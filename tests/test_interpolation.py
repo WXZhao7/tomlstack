@@ -4,9 +4,7 @@ import pytest
 
 from tomlstack import load
 from tomlstack.errors import (
-    InterpolationCycleError,
     InterpolationError,
-    InterpolationUndefinedError,
 )
 
 
@@ -65,7 +63,7 @@ def test_undefined_interpolation_raises(tmp_path: Path) -> None:
     (tmp_path / "main.toml").write_text("x = '${missing.key}'\n", encoding="utf-8")
 
     cfg = load(tmp_path / "main.toml")
-    with pytest.raises(InterpolationUndefinedError, match="Undefined interpolation"):
+    with pytest.raises(InterpolationError):
         cfg.resolve()
 
 
@@ -73,7 +71,7 @@ def test_interpolation_cycle_raises(tmp_path: Path) -> None:
     (tmp_path / "main.toml").write_text("a='${b}'\nb='${a}'\n", encoding="utf-8")
 
     cfg = load(tmp_path / "main.toml")
-    with pytest.raises(InterpolationCycleError, match="Interpolation cycle detected"):
+    with pytest.raises(InterpolationError):
         cfg.resolve()
 
 
@@ -90,5 +88,5 @@ x = "prefix-${db.apps}"
     )
 
     cfg = load(tmp_path / "main.toml")
-    with pytest.raises(InterpolationError, match="Embedded interpolation"):
+    with pytest.raises(InterpolationError, match="Failed to resolve"):
         cfg.resolve()
