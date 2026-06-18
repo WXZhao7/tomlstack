@@ -6,9 +6,6 @@ DataPath = tuple[str | int, ...]
 CONFIG_TABLE = "tomlstack"
 ROOT_PATH: DataPath = ()
 
-UNDECLARED_VERSION = 0
-SUPPORTED_VERSIONS = {1}
-
 
 @dataclass(frozen=True, slots=True)
 class TomlFile:

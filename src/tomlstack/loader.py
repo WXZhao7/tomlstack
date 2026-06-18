@@ -8,13 +8,11 @@ from os import PathLike
 from pathlib import Path
 from typing import Any
 
-from .errors import ContentError, IncludeCycleError, VersionError
+from .errors import ContentError, IncludeCycleError
 from .include import IncludeSpec
 from .types import (
     CONFIG_TABLE,
     ROOT_PATH,
-    SUPPORTED_VERSIONS,
-    UNDECLARED_VERSION,
     DataPath,
     TomlFile,
     TomlHist,
@@ -38,8 +36,6 @@ class LoadResult:
 class _LoadContext:
     file_stack: list[TomlFile] = field(default_factory=list)
     # current include stack for cycle detection
-    file_versions: dict[Path, int] = field(default_factory=dict)
-    # mapping of file paths to their declared or inferred version
 
     @property
     def depth(self) -> int:
@@ -50,55 +46,19 @@ class _LoadContext:
 
     @contextmanager
     def enter_file(self, entry: TomlFile):
+        self._validate_cycle_include(entry)
         toml = parse_raw_file(entry.path)
 
-        self._validate_cycle_include(entry)
-        try:
-            version = self._get_version(toml.metadata)
-            self._validate_version(version)
-        except VersionError as e:
-            raise VersionError(
-                f"Version conflict when including {entry.str_!r} "
-                f"resolved as {entry.path}\n"
-                "Current include chain:\n" + self._render_include_chain()
-            ) from e
-
         self.file_stack.append(entry)
-        self.file_versions[entry.path] = version
         try:
             yield toml
         finally:
             self.file_stack.pop()
 
-    @classmethod
-    def _get_version(cls, meta: dict[str, Any]) -> int:
-        v = meta.get("version")
-        if v is None:
-            return UNDECLARED_VERSION
-        if not isinstance(v, int):
-            raise VersionError(f"Invalid type tomlstack.version {v!r}")
-        if v not in SUPPORTED_VERSIONS:
-            raise VersionError(f"Unsupported tomlstack.version {v!r}")
-        return v
-
-    def _validate_version(self, version: int) -> None:
-        if version == UNDECLARED_VERSION:
-            return
-        declared_version = set(self.file_versions.values())
-        declared_version.discard(UNDECLARED_VERSION)
-        declared_version.add(version)
-
-        if len(declared_version) > 1:
-            raise VersionError(
-                f"Conflicting tomlstack.version value {version} "
-                f"with declared {declared_version!r}"
-            )
-
     def _validate_cycle_include(self, entry: TomlFile) -> None:
 
         def render_cycle_include() -> str:
-            root = self.file_stack[0]
-            msg = f"Include cycle detected when load {root.str_!r}\n"
+            msg = f"Include cycle detected when load {self.file_stack[0].str_!r}\n"
             for f in self.file_stack + [entry]:
                 if f.path == entry.path:
                     msg += f"\t=> {f.str_} -> {f.path}\n"
@@ -184,9 +144,6 @@ def parse_raw_file(path: Path) -> ParsedToml:
     with path.open("rb") as f:
         data = tomllib.load(f)
 
-    if not isinstance(data, dict):
-        raise ContentError(f"Top-level TOML object must be a table: {path}")
-
     metadata = data.pop(CONFIG_TABLE, {})
     if not isinstance(metadata, dict):
         raise ContentError(f"Invalid {CONFIG_TABLE} table in {path}")
@@ -198,9 +155,10 @@ def parse_raw_file(path: Path) -> ParsedToml:
         pass
     elif isinstance(raw_include, str):
         includes.append(raw_include)
-    elif isinstance(raw_include, list) and all(
-        isinstance(item, str) for item in raw_include
-    ):
+    elif isinstance(raw_include, list):
+        for item in raw_include:
+            if not isinstance(item, str):
+                raise ContentError(f"Invalid include item {item!r} in {path}")
         includes.extend(raw_include)
     else:
         raise ContentError(f"Invalid include specification in {path}")

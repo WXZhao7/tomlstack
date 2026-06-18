@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from tomlstack import load
-from tomlstack.errors import IncludeCycleError, IncludeError, VersionError
+from tomlstack.errors import IncludeCycleError, IncludeError
 
 
 def test_include_merge_order_and_current_override(tmp_path: Path) -> None:
@@ -152,29 +152,4 @@ root = "./b"
             "Conflict between tomlstack.include.root and tomlstack.include.anchors.root"
         ),
     ):
-        load(tmp_path / "main.toml")
-
-
-def test_unsupported_version(tmp_path: Path) -> None:
-    (tmp_path / "a.toml").write_text(
-        """
-[tomlstack]
-version = 1
-""".strip()
-        + "\n",
-        encoding="utf-8",
-    )
-    (tmp_path / "b.toml").write_text(
-        """
-[tomlstack]
-version = 2
-""".strip()
-        + "\n",
-        encoding="utf-8",
-    )
-    (tmp_path / "main.toml").write_text(
-        "include = ['./a.toml', './b.toml']\n", encoding="utf-8"
-    )
-
-    with pytest.raises(VersionError, match="Version conflict when including"):
         load(tmp_path / "main.toml")
