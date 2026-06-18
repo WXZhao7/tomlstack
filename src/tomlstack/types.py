@@ -3,6 +3,7 @@ from pathlib import Path
 
 DataPath = tuple[str | int, ...]
 
+CONFIG_TABLE = "tomlstack"
 ROOT_PATH: DataPath = ()
 
 UNDECLARED_VERSION = 0

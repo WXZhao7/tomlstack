@@ -1,21 +1,3 @@
-"""
-
-```toml
-__meta__.include.root = "./parent"
-# __meta__.include.anchors.root = "./parent
-__meta__.include.anchors.project = "/abs/path/project"
-
-include = [
-    "./relative.toml",
-    "../relative.toml",
-    "/abs/path/absolute.toml",
-    "@root/anchor.toml",
-    "@project/anchor.toml",
-]
-```
-
-"""
-
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Self
@@ -82,11 +64,11 @@ class IncludeSpec:
             return cls(file=file)
 
         if not isinstance(include, dict):
-            raise IncludeError(f"Invalid __meta__.include in {file!r}")
+            raise IncludeError(f"Invalid tomlstack.include in {file!r}")
 
         anchors_raw = include.get("anchors", {})
         if not isinstance(anchors_raw, dict):
-            raise IncludeError("Invalid __meta__.include.anchors table")
+            raise IncludeError("Invalid tomlstack.include.anchors table")
 
         anchors: dict[str, TomlFile] = {}
         refpath = file.path.parent
@@ -101,7 +83,7 @@ class IncludeSpec:
         if "root" in include:
             root_value = include["root"]
             if not isinstance(root_value, str):
-                raise IncludeError("Invalid __meta__.include.root")
+                raise IncludeError("Invalid tomlstack.include.root")
 
             if "root" not in anchors:
                 anchors["root"] = TomlFile(
@@ -110,8 +92,8 @@ class IncludeSpec:
             else:
                 if anchors["root"].str_ != root_value:
                     raise IncludeError(
-                        "Conflict between __meta__.include.root and "
-                        "__meta__.include.anchors.root"
+                        "Conflict between tomlstack.include.root and "
+                        "tomlstack.include.anchors.root"
                     )
 
         return cls(file=file, anchors=anchors)

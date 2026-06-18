@@ -11,6 +11,7 @@ from typing import Any
 from .errors import ContentError, IncludeCycleError, VersionError
 from .include import IncludeSpec
 from .types import (
+    CONFIG_TABLE,
     ROOT_PATH,
     SUPPORTED_VERSIONS,
     UNDECLARED_VERSION,
@@ -75,9 +76,9 @@ class _LoadContext:
         if v is None:
             return UNDECLARED_VERSION
         if not isinstance(v, int):
-            raise VersionError(f"Invalid type __meta__.version {v!r}")
+            raise VersionError(f"Invalid type tomlstack.version {v!r}")
         if v not in SUPPORTED_VERSIONS:
-            raise VersionError(f"Unsupported __meta__.version {v!r}")
+            raise VersionError(f"Unsupported tomlstack.version {v!r}")
         return v
 
     def _validate_version(self, version: int) -> None:
@@ -89,7 +90,7 @@ class _LoadContext:
 
         if len(declared_version) > 1:
             raise VersionError(
-                f"Conflicting __meta__.version value {version} "
+                f"Conflicting tomlstack.version value {version} "
                 f"with declared {declared_version!r}"
             )
 
@@ -186,9 +187,9 @@ def parse_raw_file(path: Path) -> ParsedToml:
     if not isinstance(data, dict):
         raise ContentError(f"Top-level TOML object must be a table: {path}")
 
-    metadata = data.pop("__meta__", {})
+    metadata = data.pop(CONFIG_TABLE, {})
     if not isinstance(metadata, dict):
-        raise ContentError(f"Invalid __meta__ table in {path}")
+        raise ContentError(f"Invalid {CONFIG_TABLE} table in {path}")
 
     includes: list[str] = []
     raw_include = data.pop("include", None)

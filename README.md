@@ -60,27 +60,27 @@ print(cfg.to_dict())
 - syntax: string or list of strings
 - valid include path forms:
 - `./...` or `../...`
-- `@label/...` (label from `__meta__.include.anchors`)
+- `@label/...` (label from `tomlstack.include.anchors`)
 - absolute path
 - any other form raises error with hint: `Use ./ or ../ or @label/`
 
 ### Meta Include Directives
 
 ```toml
-[__meta__]
+[tomlstack]
 version = 1
 
-[__meta__.include]
+[tomlstack.include]
 root = "../.."
 
-[__meta__.include.anchors]
+[tomlstack.include.anchors]
 proj = "./shared"
 ```
 
-- `__meta__.include.root` is sugar for `anchors.root`
+- `tomlstack.include.root` is sugar for `anchors.root`
 - if both `root` and `anchors.root` exist and resolve differently, error
 - anchor/root path values must be absolute or start with `./` or `../`
-- if any file explicitly sets `__meta__.version`, all files in include chain must share one supported version (`1`)
+- if any file explicitly sets `tomlstack.version`, all files in include chain must share one supported version (`1`)
 
 ## Merge Rules
 

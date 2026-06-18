@@ -62,7 +62,7 @@ def test_relative_include_and_anchor_include(tmp_path: Path) -> None:
 include = ["./local.toml", "@root/base.toml"]
 z = 3
 
-[__meta__.include]
+[tomlstack.include]
 root = "../shared"
 """.strip()
         + "\n",
@@ -71,6 +71,25 @@ root = "../shared"
 
     cfg = load(project / "main.toml")
     assert cfg.to_dict() == {"w": 2, "v": 1, "z": 3}
+
+
+def test_tomlstack_table_is_configuration_not_data(tmp_path: Path) -> None:
+    (tmp_path / "main.toml").write_text(
+        """
+x = 1
+
+[tomlstack]
+version = 1
+
+[app]
+name = "demo"
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    cfg = load(tmp_path / "main.toml")
+    assert cfg.to_dict() == {"x": 1, "app": {"name": "demo"}}
 
 
 def test_invalid_include_format_error(tmp_path: Path) -> None:
@@ -117,10 +136,10 @@ v = 1
 def test_meta_root_and_anchor_root_conflict(tmp_path: Path) -> None:
     (tmp_path / "main.toml").write_text(
         """
-[__meta__.include]
+[tomlstack.include]
 root = "./a"
 
-[__meta__.include.anchors]
+[tomlstack.include.anchors]
 root = "./b"
 """.strip()
         + "\n",
@@ -130,7 +149,7 @@ root = "./b"
     with pytest.raises(
         IncludeError,
         match=(
-            "Conflict between __meta__.include.root and __meta__.include.anchors.root"
+            "Conflict between tomlstack.include.root and tomlstack.include.anchors.root"
         ),
     ):
         load(tmp_path / "main.toml")
@@ -139,7 +158,7 @@ root = "./b"
 def test_unsupported_version(tmp_path: Path) -> None:
     (tmp_path / "a.toml").write_text(
         """
-[__meta__]
+[tomlstack]
 version = 1
 """.strip()
         + "\n",
@@ -147,7 +166,7 @@ version = 1
     )
     (tmp_path / "b.toml").write_text(
         """
-[__meta__]
+[tomlstack]
 version = 2
 """.strip()
         + "\n",
