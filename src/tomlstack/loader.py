@@ -23,6 +23,7 @@ from .types import (
 class ParsedToml:
     metadata: dict[str, Any]
     includes: list[str]
+    anchors: dict[str, str]
     data: dict[str, Any]
 
 
@@ -84,20 +85,21 @@ def _load_file(entry: TomlFile, ctx: _LoadContext) -> LoadResult:
         current_history = record_history(
             toml.data, TomlHist(file=entry, depth=ctx.depth)
         )
-        include_spec = IncludeSpec.from_toml(entry, toml.metadata)
-        if toml.includes:
-            merged_data: dict[str, Any] = {}
-            merged_history: dict[DataPath, list[TomlHist]] = {}
-            for raw_path in toml.includes:
-                abs_path = include_spec.resolve_include_path(raw_path)
-                included = _load_file(TomlFile(str_=raw_path, path=abs_path), ctx)
-                merged_data = merge_data(merged_data, included.data)
-                merged_history = merge_history(merged_history, included.history)
-            merged_data = merge_data(merged_data, current_data)
-            merged_history = merge_history(merged_history, current_history)
-            return LoadResult(data=merged_data, history=merged_history)
-        else:
+        if not toml.includes:
             return LoadResult(data=current_data, history=current_history)
+        # Includes are merged in order; later includes override earlier ones.
+        # The current file has the highest precedence.
+        include_spec = IncludeSpec.from_toml(entry, toml.anchors)
+        merged_data: dict[str, Any] = {}
+        merged_history: dict[DataPath, list[TomlHist]] = {}
+        for raw_path in toml.includes:
+            abs_path = include_spec.resolve_include_path(raw_path)
+            included = _load_file(TomlFile(str_=raw_path, path=abs_path), ctx)
+            merged_data = merge_data(merged_data, included.data)
+            merged_history = merge_history(merged_history, included.history)
+        merged_data = merge_data(merged_data, current_data)
+        merged_history = merge_history(merged_history, current_history)
+        return LoadResult(data=merged_data, history=merged_history)
 
 
 def record_history(data: Any, hist: TomlHist):
@@ -163,4 +165,16 @@ def parse_raw_file(path: Path) -> ParsedToml:
     else:
         raise ContentError(f"Invalid include specification in {path}")
 
-    return ParsedToml(metadata=metadata, includes=includes, data=data)
+    anchors: dict[str, str] = {}
+    raw_anchors = metadata.get("anchors", None)
+    if raw_anchors is None:
+        pass
+    elif isinstance(raw_anchors, dict):
+        for label, value in raw_anchors.items():
+            if not isinstance(value, str):
+                raise ContentError(f"Invalid anchor {label!r} -> {value!r} in {path}")
+            anchors[label] = value
+    else:
+        raise ContentError(f"Invalid anchors specification in {path}")
+
+    return ParsedToml(metadata=metadata, includes=includes, anchors=anchors, data=data)

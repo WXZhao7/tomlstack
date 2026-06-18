@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Self
+from typing import Self
 
 from .errors import IncludeError
 from .types import TomlFile
@@ -56,44 +56,13 @@ class IncludeSpec:
         )
 
     @classmethod
-    def from_toml(cls, file: TomlFile, metadata: dict[str, Any]) -> Self:
-        # ref: Path = file.path.parent
-
-        include = metadata.get("include")
-        if include is None:
-            return cls(file=file)
-
-        if not isinstance(include, dict):
-            raise IncludeError(f"Invalid tomlstack.include in {file!r}")
-
-        anchors_raw = include.get("anchors", {})
-        if not isinstance(anchors_raw, dict):
-            raise IncludeError("Invalid tomlstack.include.anchors table")
-
+    def from_toml(cls, file: TomlFile, raw_anchors: dict[str, str]) -> Self:
         anchors: dict[str, TomlFile] = {}
-        refpath = file.path.parent
-        for label, raw_value in anchors_raw.items():
-            if not isinstance(label, str) or not isinstance(raw_value, str):
-                raise IncludeError("Anchor labels and values must be strings")
+        ref_path = file.path.parent
+
+        for label, raw_value in raw_anchors.items():
             anchors[label] = TomlFile(
-                str_=raw_value, path=cls.resolve_anchor_path(refpath, raw_value)
+                str_=raw_value, path=cls.resolve_anchor_path(ref_path, raw_value)
             )
-
-        # magic root anchor
-        if "root" in include:
-            root_value = include["root"]
-            if not isinstance(root_value, str):
-                raise IncludeError("Invalid tomlstack.include.root")
-
-            if "root" not in anchors:
-                anchors["root"] = TomlFile(
-                    str_=root_value, path=cls.resolve_anchor_path(refpath, root_value)
-                )
-            else:
-                if anchors["root"].str_ != root_value:
-                    raise IncludeError(
-                        "Conflict between tomlstack.include.root and "
-                        "tomlstack.include.anchors.root"
-                    )
 
         return cls(file=file, anchors=anchors)

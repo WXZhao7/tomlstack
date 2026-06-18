@@ -62,7 +62,7 @@ def test_relative_include_and_anchor_include(tmp_path: Path) -> None:
 include = ["./local.toml", "@root/base.toml"]
 z = 3
 
-[tomlstack.include]
+[tomlstack.anchors]
 root = "../shared"
 """.strip()
         + "\n",
@@ -131,25 +131,3 @@ v = 1
 
     cfg = load(tmp_path / "main.toml")
     assert cfg.to_dict() == {"a": {"include": "./x.toml", "v": 1}}
-
-
-def test_meta_root_and_anchor_root_conflict(tmp_path: Path) -> None:
-    (tmp_path / "main.toml").write_text(
-        """
-[tomlstack.include]
-root = "./a"
-
-[tomlstack.include.anchors]
-root = "./b"
-""".strip()
-        + "\n",
-        encoding="utf-8",
-    )
-
-    with pytest.raises(
-        IncludeError,
-        match=(
-            "Conflict between tomlstack.include.root and tomlstack.include.anchors.root"
-        ),
-    ):
-        load(tmp_path / "main.toml")
