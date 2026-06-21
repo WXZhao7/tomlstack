@@ -12,8 +12,10 @@ class Node:
     key: DataPath
 
     def __post_init__(self) -> None:
-        if self.key not in self._cfg._history:
-            raise KeyError(f"Node path does not exist: {self.key}")
+        try:
+            self._cfg._get_raw(self.key)
+        except (KeyError, IndexError):
+            raise KeyError(f"Node path does not exist: {self.key}") from None
 
     @property
     def raw(self) -> Any:
@@ -29,11 +31,11 @@ class Node:
 
     @property
     def origin(self) -> TomlHist:
-        return self._cfg._history[self.key][-1]
+        return self.history[-1]
 
     @property
     def history(self) -> tuple[TomlHist, ...]:
-        return tuple(self._cfg._history[self.key])
+        return self._cfg._get_history(self.key)
 
     def preview(self) -> str:
         return _render_preview(self.raw)
@@ -62,11 +64,11 @@ class Node:
 
 
 class ConfigProtocol(Protocol):
-    _history: dict[DataPath, list[TomlHist]]
-
     def _get_raw(self, path: DataPath) -> Any: ...
 
     def _get_value(self, path: DataPath) -> Any: ...
+
+    def _get_history(self, path: DataPath) -> tuple[TomlHist, ...]: ...
 
 
 def _render_preview(value: Any, indent: int = 0) -> str:

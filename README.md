@@ -67,20 +67,12 @@ print(cfg.to_dict())
 ### Meta Include Directives
 
 ```toml
-[tomlstack]
-version = 1
-
-[tomlstack.include]
-root = "../.."
-
-[tomlstack.include.anchors]
+[tomlstack.anchors]
 proj = "./shared"
 ```
 
-- `tomlstack.include.root` is sugar for `anchors.root`
-- if both `root` and `anchors.root` exist and resolve differently, error
-- anchor/root path values must be absolute or start with `./` or `../`
-- if any file explicitly sets `tomlstack.version`, all files in include chain must share one supported version (`1`)
+- anchor path values must be absolute or start with `./` or `../`
+- anchors are local to the file that declares them
 
 ## Merge Rules
 
@@ -123,6 +115,10 @@ Conflict behavior:
 - `node.preview()`
 - `cfg.to_toml()` -> `NotImplementedError`
 
+History records definitions of the same data path from lowest to highest priority.
+When a list or value type is replaced, its old child paths are discarded. Resolving an
+interpolation does not change the history of the node containing the expression.
+
 ## Current Limitations
 
 - interpolation path parser supports unquoted dot keys and numeric list indices
@@ -132,7 +128,6 @@ Conflict behavior:
 ## TODO
 
 - [ ] review the details of interpolation
-- [ ] explain history with interpolation
 
 ## Release To PyPI
 

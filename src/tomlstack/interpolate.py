@@ -9,7 +9,8 @@ from .errors import (
     InterpolationCycleError,
     InterpolationError,
 )
-from .path_expr import format_path_expr, get_by_path, parse_path_expr
+from .loader import _DataNode, _get_node
+from .path_expr import format_path_expr, parse_path_expr
 from .types import ROOT_PATH, DataPath
 
 EXPR_RE = re.compile(r"\$\{([^{}]+)\}")
@@ -19,30 +20,38 @@ ALLOWED_EMBED_TYPES_STR = ", ".join(t.__name__ for t in ALLOWED_EMBED_TYPES)
 
 @dataclass
 class _InterpolationState:
-    raw_data: dict[str, Any]
+    raw_root: _DataNode
     resolved_cache: dict[DataPath, Any]
     resolving_stack: list[DataPath]
 
 
-def resolve_interpolations(raw_data: dict[str, Any]) -> dict[str, Any]:
+def resolve_interpolations(raw_root: _DataNode) -> dict[str, Any]:
     state = _InterpolationState(
-        raw_data=raw_data, resolved_cache={}, resolving_stack=[]
+        raw_root=raw_root, resolved_cache={}, resolving_stack=[]
     )
-    return _resolve_node(raw_data, ROOT_PATH, state)
+    resolved = _resolve_node(raw_root, ROOT_PATH, state)
+    assert isinstance(resolved, dict)
+    return resolved
 
 
-def _resolve_node(node: Any, path: DataPath, state: _InterpolationState) -> Any:
+def _resolve_node(node: _DataNode, path: DataPath, state: _InterpolationState) -> Any:
     """Recursively resolve interpolations in a value"""
-    if isinstance(node, dict):
-        return {k: _resolve_node(v, (*path, k), state) for k, v in node.items()}
-    if isinstance(node, list):
-        return [_resolve_node(v, (*path, i), state) for i, v in enumerate(node)]
-    if isinstance(node, str):
+    if isinstance(node.value, dict):
+        return {
+            key: _resolve_node(child, (*path, key), state)
+            for key, child in node.value.items()
+        }
+    if isinstance(node.value, list):
+        return [
+            _resolve_node(child, (*path, index), state)
+            for index, child in enumerate(node.value)
+        ]
+    if isinstance(node.value, str):
         try:
-            return _resolve_string(node, state)
+            return _resolve_string(node.value, state)
         except Exception as e:
-            raise InterpolationError(f"Failed to resolve {node!r}") from e
-    return node
+            raise InterpolationError(f"Failed to resolve {node.value!r}") from e
+    return node.value
 
 
 def _resolve_string(str_expr: str, state: _InterpolationState) -> Any:
@@ -114,8 +123,8 @@ def _resolve_path_expr(path_expr: str, state: _InterpolationState) -> Any:
     state.resolving_stack.append(path)
 
     try:
-        raw_value = get_by_path(state.raw_data, path)
-        resolved = _resolve_node(raw_value, path, state)
+        raw_node = _get_node(state.raw_root, path)
+        resolved = _resolve_node(raw_node, path, state)
         state.resolved_cache[path] = resolved
         return resolved
     finally:

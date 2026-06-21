@@ -48,6 +48,66 @@ host = "main"
     }
 
 
+def test_replacing_list_discards_replaced_element_history(tmp_path: Path) -> None:
+    (tmp_path / "base.toml").write_text(
+        "items = ['base-0', 'base-1']\n", encoding="utf-8"
+    )
+    (tmp_path / "main.toml").write_text(
+        "include = './base.toml'\nitems = ['main-0']\n", encoding="utf-8"
+    )
+
+    cfg = load(tmp_path / "main.toml")
+
+    assert cfg["items"].raw == ["main-0"]
+    assert [hist.file.str_ for hist in cfg["items"].history] == [
+        "./base.toml",
+        str(tmp_path / "main.toml"),
+    ]
+    assert [hist.file.str_ for hist in cfg["items"][0].history] == [
+        str(tmp_path / "main.toml")
+    ]
+    with pytest.raises(IndexError):
+        cfg["items"][1]
+
+
+def test_replacing_table_discards_replaced_child_history(tmp_path: Path) -> None:
+    (tmp_path / "base.toml").write_text(
+        "[value]\nold = 'base'\n", encoding="utf-8"
+    )
+    (tmp_path / "main.toml").write_text(
+        "include = './base.toml'\nvalue = 'main'\n", encoding="utf-8"
+    )
+
+    cfg = load(tmp_path / "main.toml")
+
+    assert cfg["value"].raw == "main"
+    assert [hist.file.str_ for hist in cfg["value"].history] == [
+        "./base.toml",
+        str(tmp_path / "main.toml"),
+    ]
+    with pytest.raises(TypeError):
+        cfg["value"]["old"]
+
+
+def test_replacing_scalar_with_table_keeps_only_new_child_history(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "base.toml").write_text("value = 'base'\n", encoding="utf-8")
+    (tmp_path / "main.toml").write_text(
+        "include = './base.toml'\n[value]\nnew = 'main'\n", encoding="utf-8"
+    )
+
+    cfg = load(tmp_path / "main.toml")
+
+    assert [hist.file.str_ for hist in cfg["value"].history] == [
+        "./base.toml",
+        str(tmp_path / "main.toml"),
+    ]
+    assert [hist.file.str_ for hist in cfg["value"]["new"].history] == [
+        str(tmp_path / "main.toml")
+    ]
+
+
 def test_relative_include_and_anchor_include(tmp_path: Path) -> None:
     shared = tmp_path / "shared"
     project = tmp_path / "project"

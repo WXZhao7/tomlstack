@@ -32,6 +32,20 @@ app0 = "${db.apps[0]}"
     assert d["p"]["app0"] == "api"
 
 
+def test_interpolation_keeps_expression_provenance(tmp_path: Path) -> None:
+    (tmp_path / "base.toml").write_text("source = 42\n", encoding="utf-8")
+    (tmp_path / "main.toml").write_text(
+        "include = './base.toml'\ntarget = '${source}'\n", encoding="utf-8"
+    )
+
+    cfg = load(tmp_path / "main.toml")
+
+    assert cfg["target"].raw == "${source}"
+    assert cfg["target"].value == 42
+    assert cfg["target"].origin.file.str_ == str(tmp_path / "main.toml")
+    assert cfg["source"].origin.file.str_ == "./base.toml"
+
+
 def test_embedded_interpolation_and_format(tmp_path: Path) -> None:
     (tmp_path / "main.toml").write_text(
         """

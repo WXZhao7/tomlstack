@@ -2,17 +2,16 @@ from __future__ import annotations
 
 import tomllib
 from contextlib import contextmanager
-from copy import deepcopy
 from dataclasses import dataclass, field
+from datetime import date, datetime, time
 from os import PathLike
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeAlias
 
 from .errors import ContentError, IncludeCycleError
 from .include import IncludeSpec
 from .types import (
     CONFIG_TABLE,
-    ROOT_PATH,
     DataPath,
     TomlFile,
     TomlHist,
@@ -27,10 +26,21 @@ class ParsedToml:
     data: dict[str, Any]
 
 
-@dataclass
+TomlScalar: TypeAlias = str | int | float | bool | date | time | datetime
+_DataNodeValue: TypeAlias = (
+    TomlScalar | dict[str, "_DataNode"] | list["_DataNode"]
+)
+
+
+@dataclass(frozen=True, slots=True)
+class _DataNode:
+    value: _DataNodeValue
+    history: tuple[TomlHist, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class LoadResult:
-    data: dict[str, Any]
-    history: dict[DataPath, list[TomlHist]]
+    root: _DataNode
 
 
 @dataclass
@@ -81,65 +91,73 @@ def load_toml_with_includes(root_file: str | PathLike[str]) -> LoadResult:
 def _load_file(entry: TomlFile, ctx: _LoadContext) -> LoadResult:
 
     with ctx.enter_file(entry) as toml:
-        current_data = toml.data
-        current_history = record_history(
+        current = _annotate(
             toml.data, TomlHist(file=entry, depth=ctx.depth)
         )
         if not toml.includes:
-            return LoadResult(data=current_data, history=current_history)
+            return LoadResult(root=current)
         # Includes are merged in order; later includes override earlier ones.
         # The current file has the highest precedence.
         include_spec = IncludeSpec.from_toml(entry, toml.anchors)
-        merged_data: dict[str, Any] = {}
-        merged_history: dict[DataPath, list[TomlHist]] = {}
+        merged = _DataNode(value={}, history=())
         for raw_path in toml.includes:
             abs_path = include_spec.resolve_include_path(raw_path)
             included = _load_file(TomlFile(str_=raw_path, path=abs_path), ctx)
-            merged_data = merge_data(merged_data, included.data)
-            merged_history = merge_history(merged_history, included.history)
-        merged_data = merge_data(merged_data, current_data)
-        merged_history = merge_history(merged_history, current_history)
-        return LoadResult(data=merged_data, history=merged_history)
+            merged = _merge_nodes(merged, included.root)
+        return LoadResult(root=_merge_nodes(merged, current))
 
 
-def record_history(data: Any, hist: TomlHist):
-    history: dict[DataPath, list[TomlHist]] = {}
-
-    def walk(value: Any, path: DataPath) -> None:
-        history.setdefault(path, []).append(hist)
-        if isinstance(value, dict):
-            for key, child in value.items():
-                walk(child, (*path, key))
-        elif isinstance(value, list):
-            for idx, child in enumerate(value):
-                walk(child, (*path, idx))
-
-    walk(data, ROOT_PATH)
-    return history
+def _annotate(value: Any, hist: TomlHist) -> _DataNode:
+    annotated: _DataNodeValue
+    if isinstance(value, dict):
+        annotated = {key: _annotate(child, hist) for key, child in value.items()}
+    elif isinstance(value, list):
+        annotated = [_annotate(child, hist) for child in value]
+    else:
+        annotated = value
+    return _DataNode(value=annotated, history=(hist,))
 
 
-def merge_data(low: dict[str, Any], high: dict[str, Any]) -> dict[str, Any]:
-    """Merge two dictionaries with high priority overriding low priority."""
-    result: dict[str, Any] = deepcopy(low)
-    for key, high_value in high.items():
-        if (
-            key in result
-            and isinstance(result[key], dict)
-            and isinstance(high_value, dict)
-        ):
-            result[key] = merge_data(result[key], high_value)
+def _merge_nodes(low: _DataNode, high: _DataNode) -> _DataNode:
+    """Merge two nodes with high priority overriding low priority."""
+    history = low.history + high.history
+    if isinstance(low.value, dict) and isinstance(high.value, dict):
+        merged = dict(low.value)
+        for key, high_child in high.value.items():
+            if key in merged:
+                merged[key] = _merge_nodes(merged[key], high_child)
+            else:
+                merged[key] = high_child
+        return _DataNode(value=merged, history=history)
+    return _DataNode(value=high.value, history=history)
+
+
+def _get_node(root: _DataNode, path: DataPath) -> _DataNode:
+    node = root
+    for part in path:
+        if isinstance(part, str):
+            if not isinstance(node.value, dict) or part not in node.value:
+                raise KeyError(part)
+            node = node.value[part]
+        elif isinstance(part, int):
+            if (
+                not isinstance(node.value, list)
+                or part < 0
+                or part >= len(node.value)
+            ):
+                raise IndexError(part)
+            node = node.value[part]
         else:
-            result[key] = deepcopy(high_value)
-    return result
+            raise TypeError(f"Invalid path part: {part!r}")
+    return node
 
 
-def merge_history(
-    low: dict[DataPath, list[TomlHist]], high: dict[DataPath, list[TomlHist]]
-) -> dict[DataPath, list[TomlHist]]:
-    merged = {path: entries[:] for path, entries in low.items()}  # !!! important?
-    for path, entries in high.items():
-        merged.setdefault(path, []).extend(entries)
-    return merged
+def _materialize(node: _DataNode) -> Any:
+    if isinstance(node.value, dict):
+        return {key: _materialize(child) for key, child in node.value.items()}
+    if isinstance(node.value, list):
+        return [_materialize(child) for child in node.value]
+    return node.value
 
 
 def parse_raw_file(path: Path) -> ParsedToml:
