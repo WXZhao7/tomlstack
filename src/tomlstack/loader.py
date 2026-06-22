@@ -3,18 +3,18 @@ from __future__ import annotations
 import tomllib
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import date, datetime, time
 from os import PathLike
 from pathlib import Path
-from typing import Any, TypeAlias
+from typing import Any
 
 from .errors import ContentError, IncludeCycleError
 from .include import IncludeSpec
 from .types import (
     CONFIG_TABLE,
-    DataPath,
     TomlFile,
     TomlHist,
+    _DataNode,
+    _DataNodeValue,
 )
 
 
@@ -24,23 +24,6 @@ class ParsedToml:
     includes: list[str]
     anchors: dict[str, str]
     data: dict[str, Any]
-
-
-TomlScalar: TypeAlias = str | int | float | bool | date | time | datetime
-_DataNodeValue: TypeAlias = (
-    TomlScalar | dict[str, "_DataNode"] | list["_DataNode"]
-)
-
-
-@dataclass(frozen=True, slots=True)
-class _DataNode:
-    value: _DataNodeValue
-    history: tuple[TomlHist, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class LoadResult:
-    root: _DataNode
 
 
 @dataclass
@@ -82,20 +65,17 @@ class _LoadContext:
                 raise IncludeCycleError(render_cycle_include())
 
 
-def load_toml_with_includes(root_file: str | PathLike[str]) -> LoadResult:
+def load_toml_with_includes(root_file: str | PathLike[str]) -> _DataNode:
     abs_path = Path(root_file).expanduser().resolve()
-    result = _load_file(TomlFile(str_=str(root_file), path=abs_path), _LoadContext())
-    return result
+    return _load_file(TomlFile(str_=str(root_file), path=abs_path), _LoadContext())
 
 
-def _load_file(entry: TomlFile, ctx: _LoadContext) -> LoadResult:
+def _load_file(entry: TomlFile, ctx: _LoadContext) -> _DataNode:
 
     with ctx.enter_file(entry) as toml:
-        current = _annotate(
-            toml.data, TomlHist(file=entry, depth=ctx.depth)
-        )
+        current = _annotate(toml.data, TomlHist(file=entry, depth=ctx.depth))
         if not toml.includes:
-            return LoadResult(root=current)
+            return current
         # Includes are merged in order; later includes override earlier ones.
         # The current file has the highest precedence.
         include_spec = IncludeSpec.from_toml(entry, toml.anchors)
@@ -103,8 +83,8 @@ def _load_file(entry: TomlFile, ctx: _LoadContext) -> LoadResult:
         for raw_path in toml.includes:
             abs_path = include_spec.resolve_include_path(raw_path)
             included = _load_file(TomlFile(str_=raw_path, path=abs_path), ctx)
-            merged = _merge_nodes(merged, included.root)
-        return LoadResult(root=_merge_nodes(merged, current))
+            merged = _merge_nodes(merged, included)
+        return _merge_nodes(merged, current)
 
 
 def _annotate(value: Any, hist: TomlHist) -> _DataNode:
@@ -122,7 +102,7 @@ def _merge_nodes(low: _DataNode, high: _DataNode) -> _DataNode:
     """Merge two nodes with high priority overriding low priority."""
     history = low.history + high.history
     if isinstance(low.value, dict) and isinstance(high.value, dict):
-        merged = dict(low.value)
+        merged = dict(low.value)  # 这里是shallow copy/deep copy/其他方案?
         for key, high_child in high.value.items():
             if key in merged:
                 merged[key] = _merge_nodes(merged[key], high_child)
@@ -130,34 +110,6 @@ def _merge_nodes(low: _DataNode, high: _DataNode) -> _DataNode:
                 merged[key] = high_child
         return _DataNode(value=merged, history=history)
     return _DataNode(value=high.value, history=history)
-
-
-def _get_node(root: _DataNode, path: DataPath) -> _DataNode:
-    node = root
-    for part in path:
-        if isinstance(part, str):
-            if not isinstance(node.value, dict) or part not in node.value:
-                raise KeyError(part)
-            node = node.value[part]
-        elif isinstance(part, int):
-            if (
-                not isinstance(node.value, list)
-                or part < 0
-                or part >= len(node.value)
-            ):
-                raise IndexError(part)
-            node = node.value[part]
-        else:
-            raise TypeError(f"Invalid path part: {part!r}")
-    return node
-
-
-def _materialize(node: _DataNode) -> Any:
-    if isinstance(node.value, dict):
-        return {key: _materialize(child) for key, child in node.value.items()}
-    if isinstance(node.value, list):
-        return [_materialize(child) for child in node.value]
-    return node.value
 
 
 def parse_raw_file(path: Path) -> ParsedToml:

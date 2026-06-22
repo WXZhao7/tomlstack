@@ -162,7 +162,7 @@ port = 8080
 
     cfg = load(tmp_path / "main.toml")
 
-    assert cfg.to_dict(resolve=False) == {
+    assert cfg.to_dict() == {
         "service": {
             "host": "overlay",
             "auth": {"user": "base-user", "password": "secret"},

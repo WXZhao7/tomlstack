@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import date, datetime, time
 from typing import Any
@@ -9,13 +10,28 @@ from .errors import (
     InterpolationCycleError,
     InterpolationError,
 )
-from .loader import _DataNode, _get_node
 from .path_expr import format_path_expr, parse_path_expr
-from .types import ROOT_PATH, DataPath
+from .types import ROOT_PATH, DataPath, _DataNode
 
 EXPR_RE = re.compile(r"\$\{([^{}]+)\}")
 ALLOWED_EMBED_TYPES = (str, int, float, bool, date, time, datetime)
 ALLOWED_EMBED_TYPES_STR = ", ".join(t.__name__ for t in ALLOWED_EMBED_TYPES)
+
+
+def _get_node(root: _DataNode, path: DataPath) -> _DataNode:
+    node = root
+    for part in path:
+        if isinstance(part, str):
+            if not isinstance(node.value, dict) or part not in node.value:
+                raise KeyError(part)
+            node = node.value[part]
+        elif isinstance(part, int):
+            if not isinstance(node.value, list) or part < 0 or part >= len(node.value):
+                raise IndexError(part)
+            node = node.value[part]
+        else:
+            raise TypeError(f"Invalid path part: {part!r}")
+    return node
 
 
 @dataclass
@@ -114,7 +130,7 @@ def _resolve_path_expr(path_expr: str, state: _InterpolationState) -> Any:
     path = parse_path_expr(path_expr)
 
     if path in state.resolved_cache:
-        return state.resolved_cache[path]
+        return deepcopy(state.resolved_cache[path])
 
     if path in state.resolving_stack:
         chain = " -> ".join(format_path_expr(p) for p in [*state.resolving_stack, path])
@@ -126,7 +142,7 @@ def _resolve_path_expr(path_expr: str, state: _InterpolationState) -> Any:
         raw_node = _get_node(state.raw_root, path)
         resolved = _resolve_node(raw_node, path, state)
         state.resolved_cache[path] = resolved
-        return resolved
+        return deepcopy(resolved)
     finally:
         state.resolving_stack.pop()
 

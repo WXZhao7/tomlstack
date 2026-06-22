@@ -126,7 +126,7 @@ day = "${db.stamp:%y%m%d}"
     )
 
     cfg = load(tmp_path / "main.toml")
-    out = cfg.to_dict(resolve=True)
+    out = cfg.to_dict()
 
     assert out["conn"]["url"] == "postgres://alice:pw@localhost:5432"
     assert out["conn"]["short"] == "   alice"

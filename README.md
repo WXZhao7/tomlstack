@@ -5,7 +5,7 @@
 - top-level `include` loading
 - deterministic merge by include order
 - `${path}` interpolation with cycle/undefined checks
-- node-level provenance (`origin`, `explain`, `history`)
+- node-level provenance (`origin`, `history`)
 
 tomlstack does not try to be a configuration framework.
 It address two missing pieces to TOML: file composition and safe interpolation — while keeping files self-contained and explainable.
@@ -114,6 +114,9 @@ Conflict behavior:
 - `node.history`
 - `node.preview()`
 - `cfg.to_toml()` -> `NotImplementedError`
+
+`cfg.to_dict()`, `cfg.view`, `node.raw`, and `node.value` return data snapshots;
+mutating their dictionaries or lists does not modify the loaded configuration.
 
 History records definitions of the same data path from lowest to highest priority.
 When a list or value type is replaced, its old child paths are discarded. Resolving an

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Any, Protocol
 
 from .types import DataPath, TomlHist
@@ -17,11 +18,11 @@ class Node:
         except (KeyError, IndexError):
             raise KeyError(f"Node path does not exist: {self.key}") from None
 
-    @property
+    @cached_property
     def raw(self) -> Any:
         return self._cfg._get_raw(self.key)
 
-    @property
+    @cached_property
     def value(self) -> Any:
         return self._cfg._get_value(self.key)
 
@@ -33,7 +34,7 @@ class Node:
     def origin(self) -> TomlHist:
         return self.history[-1]
 
-    @property
+    @cached_property
     def history(self) -> tuple[TomlHist, ...]:
         return self._cfg._get_history(self.key)
 
