@@ -4,10 +4,28 @@ from tomlstack import load
 
 
 def test_node_access_origin_and_explain(tmp_path: Path) -> None:
-    (tmp_path / "a.toml").write_text("[db]\nhost='a'\n", encoding="utf-8")
-    (tmp_path / "b.toml").write_text("[db]\nhost='b'\nuser='u'\n", encoding="utf-8")
+    (tmp_path / "a.toml").write_text(
+        """\
+[db]
+host='a'
+""",
+        encoding="utf-8",
+    )
+    (tmp_path / "b.toml").write_text(
+        """\
+[db]
+host='b'
+user='u'
+""",
+        encoding="utf-8",
+    )
     (tmp_path / "main.toml").write_text(
-        "include = ['./a.toml','./b.toml']\n[db]\nhost='main'\n", encoding="utf-8"
+        """\
+include = ['./a.toml','./b.toml']
+[db]
+host='main'
+""",
+        encoding="utf-8",
     )
 
     cfg = load(tmp_path / "main.toml")
@@ -29,7 +47,7 @@ def test_node_access_origin_and_explain(tmp_path: Path) -> None:
 
 def test_list_index_access_and_preview(tmp_path: Path) -> None:
     (tmp_path / "main.toml").write_text(
-        """
+        """\
 [proj]
 apps = ['api', 'worker']
 """.strip()
@@ -53,3 +71,37 @@ def test_to_dict_resolve_flag(tmp_path: Path) -> None:
     cfg = load(tmp_path / "main.toml")
     assert cfg.to_dict(resolve=False) == {"x": 1}
     assert cfg.to_dict(resolve=True) == {"x": 1}
+
+
+def test_returned_mutable_values_do_not_modify_internal_state(tmp_path: Path) -> None:
+    (tmp_path / "main.toml").write_text(
+        """\
+items = [1, 2]
+copy = '${items}'
+""",
+        encoding="utf-8",
+    )
+
+    cfg = load(tmp_path / "main.toml")
+
+    raw_view = cfg.view
+    raw_view["items"].append(0)
+    assert cfg.view["items"] == [1, 2]
+
+    raw = cfg.to_dict(resolve=False)
+    raw["items"].append(3)
+    assert cfg["items"].raw == [1, 2]
+
+    resolved = cfg.to_dict()
+    resolved["items"].append(3)
+    resolved["copy"].append(4)
+    assert cfg["items"].value == [1, 2]
+    assert cfg["copy"].value == [1, 2]
+
+    node_value = cfg["items"].value
+    node_value.append(5)
+    assert cfg["items"].value == [1, 2]
+
+    view = cfg.view
+    view["items"].append(6)
+    assert cfg.view["items"] == [1, 2]

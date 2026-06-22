@@ -10,7 +10,7 @@ from tomlstack.errors import (
 
 def test_pure_interpolation_keeps_type(tmp_path: Path) -> None:
     (tmp_path / "main.toml").write_text(
-        """
+        """\
 [db]
 port = 5432
 apps = ["api", "worker"]
@@ -33,9 +33,18 @@ app0 = "${db.apps[0]}"
 
 
 def test_interpolation_keeps_expression_provenance(tmp_path: Path) -> None:
-    (tmp_path / "base.toml").write_text("source = 42\n", encoding="utf-8")
+    (tmp_path / "base.toml").write_text(
+        """\
+source = 42
+""",
+        encoding="utf-8",
+    )
     (tmp_path / "main.toml").write_text(
-        "include = './base.toml'\ntarget = '${source}'\n", encoding="utf-8"
+        """\
+include = './base.toml'
+target = '${source}'
+""",
+        encoding="utf-8",
     )
 
     cfg = load(tmp_path / "main.toml")
@@ -46,9 +55,60 @@ def test_interpolation_keeps_expression_provenance(tmp_path: Path) -> None:
     assert cfg["source"].origin.file.str_ == "./base.toml"
 
 
+def test_interpolation_reads_final_overridden_value(tmp_path: Path) -> None:
+    (tmp_path / "base.toml").write_text(
+        """\
+port = 1000
+""",
+        encoding="utf-8",
+    )
+    (tmp_path / "prod.toml").write_text(
+        """\
+port = 2000
+""",
+        encoding="utf-8",
+    )
+    (tmp_path / "main.toml").write_text(
+        """\
+include = ['./base.toml', './prod.toml']
+url = 'port=${port}'
+""",
+        encoding="utf-8",
+    )
+
+    cfg = load(tmp_path / "main.toml")
+
+    assert cfg["url"].value == "port=2000"
+    assert [item.file.str_ for item in cfg["port"].history] == [
+        "./base.toml",
+        "./prod.toml",
+    ]
+    assert cfg["url"].origin.file.str_ == str(tmp_path / "main.toml")
+
+
+def test_full_interpolation_of_complex_values_does_not_alias_results(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "main.toml").write_text(
+        """\
+source = [1, 2]
+first = '${source}'
+second = '${source}'
+""",
+        encoding="utf-8",
+    )
+
+    cfg = load(tmp_path / "main.toml")
+    result = cfg.to_dict()
+
+    assert result == {"source": [1, 2], "first": [1, 2], "second": [1, 2]}
+    assert result["source"] is not result["first"]
+    assert result["first"] is not result["second"]
+
+
 def test_embedded_interpolation_and_format(tmp_path: Path) -> None:
     (tmp_path / "main.toml").write_text(
-        """
+        """\
 [db]
 user = "alice"
 pass = "pw"
@@ -74,7 +134,12 @@ day = "${db.stamp:%y%m%d}"
 
 
 def test_undefined_interpolation_raises(tmp_path: Path) -> None:
-    (tmp_path / "main.toml").write_text("x = '${missing.key}'\n", encoding="utf-8")
+    (tmp_path / "main.toml").write_text(
+        """\
+x = '${missing.key}'
+""",
+        encoding="utf-8",
+    )
 
     cfg = load(tmp_path / "main.toml")
     with pytest.raises(InterpolationError):
@@ -82,7 +147,13 @@ def test_undefined_interpolation_raises(tmp_path: Path) -> None:
 
 
 def test_interpolation_cycle_raises(tmp_path: Path) -> None:
-    (tmp_path / "main.toml").write_text("a='${b}'\nb='${a}'\n", encoding="utf-8")
+    (tmp_path / "main.toml").write_text(
+        """\
+a = '${b}'
+b = '${a}'
+""",
+        encoding="utf-8",
+    )
 
     cfg = load(tmp_path / "main.toml")
     with pytest.raises(InterpolationError):
@@ -91,7 +162,7 @@ def test_interpolation_cycle_raises(tmp_path: Path) -> None:
 
 def test_embedded_interpolation_rejects_complex_type(tmp_path: Path) -> None:
     (tmp_path / "main.toml").write_text(
-        """
+        """\
 [db]
 apps = ["api"]
 
