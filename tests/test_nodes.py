@@ -71,3 +71,16 @@ def test_to_dict_resolve_flag(tmp_path: Path) -> None:
     cfg = load(tmp_path / "main.toml")
     assert cfg.raw == {"x": 1}
     assert cfg.to_dict() == {"x": 1}
+
+
+def test_node_raw_returns_an_independent_snapshot(tmp_path: Path) -> None:
+    (tmp_path / "main.toml").write_text(
+        "items = [1, 2]\n", encoding="utf-8"
+    )
+
+    node = load(tmp_path / "main.toml")["items"]
+    raw = node.raw
+    raw.append(3)
+
+    assert node.raw == [1, 2]
+    assert node[1].raw == 2

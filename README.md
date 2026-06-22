@@ -47,11 +47,11 @@ from tomlstack import load
 
 cfg = load("main.toml")
 print(cfg["db"]["url"].raw)    # raw interpolation string
-cfg.resolve()
 print(cfg["db"]["url"].value)  # resolved value
 print(cfg["db"]["url"].origin)
 print(cfg["db"]["url"].history)
-print(cfg.to_dict())
+print(cfg.raw)                   # raw configuration snapshot
+print(cfg.resolved)              # resolved configuration snapshot
 ```
 
 ## Include Semantics
@@ -59,10 +59,10 @@ print(cfg.to_dict())
 - top-level `include` only; nested `include` is treated as normal data
 - syntax: string or list of strings
 - valid include path forms:
-- `./...` or `../...`
-- `@label/...` (label from `tomlstack.include.anchors`)
-- absolute path
-- any other form raises error with hint: `Use ./ or ../ or @label/`
+  - `./...` or `../...`
+  - `@label/...` (label from `tomlstack.anchors`)
+  - absolute path
+- any other form raises an error with a path-format hint
 
 ### Meta Include Directives
 
@@ -71,8 +71,8 @@ print(cfg.to_dict())
 proj = "./shared"
 ```
 
-- anchor path values must be absolute or start with `./` or `../`
 - anchors are local to the file that declares them
+- anchor path values must be absolute or start with `./` or `../`
 
 ## Merge Rules
 
@@ -91,7 +91,8 @@ Conflict behavior:
 
 ## Interpolation Semantics
 
-- interpolation happens on `cfg.resolve()`
+- interpolation is resolved lazily by `cfg.resolve()`, `cfg.to_dict()`,
+  `cfg.resolved`, or `node.value`
 - path syntax supports dot and list index: `${db.apps[0]}`
 - full-string interpolation (`"${db.port}"`) keeps source type
 - embedded interpolation (`"postgres://${db.host}:${db.port}"`) allows only:
@@ -99,14 +100,15 @@ Conflict behavior:
 - formatting syntax: `${path:spec}`
 - for `date/time/datetime`, formatting uses `strftime`
 - otherwise uses Python `format(value, spec)`
-- undefined reference raises `InterpolationUndefinedError`
-- interpolation cycle raises `InterpolationCycleError`
+- invalid paths, undefined references, and cycles raise `InterpolationError`
 
 ## Public API
 
 - `cfg = load("f.toml")`
+- `cfg.raw` — raw configuration snapshot
+- `cfg.resolved` — resolved configuration snapshot
 - `cfg.resolve()`
-- `cfg.to_dict()`
+- `cfg.to_dict()` — equivalent to `cfg.resolved`
 - `node = cfg["proj"][0]["path"]["foo"]`
 - `node.raw`
 - `node.value`
@@ -115,8 +117,9 @@ Conflict behavior:
 - `node.preview()`
 - `cfg.to_toml()` -> `NotImplementedError`
 
-`cfg.to_dict()`, `cfg.view`, `node.raw`, and `node.value` return data snapshots;
-mutating their dictionaries or lists does not modify the loaded configuration.
+`cfg.raw`, `cfg.resolved`, `cfg.to_dict()`, `node.raw`, and `node.value` return
+independent data snapshots; mutating their dictionaries or lists does not modify the
+loaded configuration.
 
 History records definitions of the same data path from lowest to highest priority.
 When a list or value type is replaced, its old child paths are discarded. Resolving an

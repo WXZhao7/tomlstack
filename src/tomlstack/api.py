@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from os import PathLike
 from typing import Any
 
-from .interpolate import _get_node, resolve_interpolations
+from .interpolate import resolve_interpolations
 from .loader import _DataNode, load_toml_with_includes
 from .nodes import Node
 from .path_expr import get_by_path
@@ -44,10 +44,10 @@ class TomlStack:
         return Node(self, (key,))
 
     def _get_raw(self, path: DataPath) -> Any:
-        return _get_node(self._root, path).materialized
+        return deepcopy(self._root._get_subnode(path).materialized)
 
     def _get_history(self, path: DataPath) -> tuple[TomlHist, ...]:
-        return _get_node(self._root, path).history
+        return self._root._get_subnode(path).history
 
     def _get_value(self, path: DataPath) -> Any:
         if self._resolved is None:

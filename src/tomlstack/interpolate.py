@@ -18,22 +18,6 @@ ALLOWED_EMBED_TYPES = (str, int, float, bool, date, time, datetime)
 ALLOWED_EMBED_TYPES_STR = ", ".join(t.__name__ for t in ALLOWED_EMBED_TYPES)
 
 
-def _get_node(root: _DataNode, path: DataPath) -> _DataNode:
-    node = root
-    for part in path:
-        if isinstance(part, str):
-            if not isinstance(node.value, dict) or part not in node.value:
-                raise KeyError(part)
-            node = node.value[part]
-        elif isinstance(part, int):
-            if not isinstance(node.value, list) or part < 0 or part >= len(node.value):
-                raise IndexError(part)
-            node = node.value[part]
-        else:
-            raise TypeError(f"Invalid path part: {part!r}")
-    return node
-
-
 @dataclass
 class _InterpolationState:
     raw_root: _DataNode
@@ -139,7 +123,7 @@ def _resolve_path_expr(path_expr: str, state: _InterpolationState) -> Any:
     state.resolving_stack.append(path)
 
     try:
-        raw_node = _get_node(state.raw_root, path)
+        raw_node = state.raw_root._get_subnode(path)
         resolved = _resolve_node(raw_node, path, state)
         state.resolved_cache[path] = resolved
         return deepcopy(resolved)

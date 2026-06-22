@@ -48,6 +48,25 @@ class _DataNode:
             return [cls._to_plain_value(child) for child in node.value]
         return node.value
 
+    def _get_subnode(self, path: DataPath) -> _DataNode:
+        node = self
+        for part in path:
+            if isinstance(part, str):
+                if not isinstance(node.value, dict) or part not in node.value:
+                    raise KeyError(part)
+                node = node.value[part]
+            elif isinstance(part, int):
+                if (
+                    not isinstance(node.value, list)
+                    or part < 0
+                    or part >= len(node.value)
+                ):
+                    raise IndexError(part)
+                node = node.value[part]
+            else:
+                raise TypeError(f"Invalid path part: {part!r}")
+        return node
+
 
 TomlScalar: TypeAlias = str | int | float | bool | date | time | datetime
 _DataNodeValue: TypeAlias = TomlScalar | dict[str, _DataNode] | list[_DataNode]

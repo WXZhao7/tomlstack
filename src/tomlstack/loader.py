@@ -102,7 +102,7 @@ def _merge_nodes(low: _DataNode, high: _DataNode) -> _DataNode:
     """Merge two nodes with high priority overriding low priority."""
     history = low.history + high.history
     if isinstance(low.value, dict) and isinstance(high.value, dict):
-        merged = dict(low.value)  # 这里是shallow copy/deep copy/其他方案?
+        merged = dict(low.value)
         for key, high_child in high.value.items():
             if key in merged:
                 merged[key] = _merge_nodes(merged[key], high_child)
