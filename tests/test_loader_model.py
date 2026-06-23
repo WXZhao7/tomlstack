@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from tomlstack.loader import _DataNode, load_toml_with_includes
+from tomlstack.loader import DataNode, load_toml_with_includes
 
 
 def test_loaded_tree_recursively_binds_every_value_to_history(tmp_path: Path) -> None:
@@ -16,15 +16,15 @@ ports = [8000, 8001]
 
     root, include_tree = load_toml_with_includes(path)
 
-    def assert_node_tree(node: _DataNode) -> None:
+    def assert_node_tree(node: DataNode) -> None:
         assert isinstance(node.history, tuple)
         assert node.history
         if isinstance(node.value, dict):
-            assert all(isinstance(child, _DataNode) for child in node.value.values())
+            assert all(isinstance(child, DataNode) for child in node.value.values())
             for child in node.value.values():
                 assert_node_tree(child)
         elif isinstance(node.value, list):
-            assert all(isinstance(child, _DataNode) for child in node.value)
+            assert all(isinstance(child, DataNode) for child in node.value)
             for child in node.value:
                 assert_node_tree(child)
 

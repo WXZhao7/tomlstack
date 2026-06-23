@@ -5,11 +5,12 @@ from dataclasses import dataclass, field
 from os import PathLike
 from typing import Any
 
-from .interpolate import _ResolutionResult, resolve_interpolations
-from .loader import _DataNode, load_toml_with_includes
+from .interpolate import resolve_interpolations
+from .loader import load_toml_with_includes
 from .nodes import Node
 from .path_expr import get_by_path
 from .types import (
+    DataNode,
     DataPath,
     IncludeNode,
     InterpolationDependency,
@@ -21,9 +22,14 @@ from .types import (
 
 @dataclass
 class TomlStack:
-    _root: _DataNode
+    _root: DataNode
     _include_tree: IncludeNode
-    _resolution: _ResolutionResult | None = field(init=False, default=None)
+    _resolution: dict[str, Any] | None = field(
+        init=False, default=None, repr=False, compare=False, hash=False
+    )
+    _direct_dependencies: dict[DataPath, tuple[InterpolationDependency, ...]] | None = (
+        field(init=False, default=None, repr=False, compare=False, hash=False)
+    )
 
     @property
     def raw(self) -> Any:
@@ -34,14 +40,16 @@ class TomlStack:
         return self.to_dict()
 
     def resolve(self) -> TomlStack:
-        if self._resolution is None:
-            self._resolution = resolve_interpolations(self._root)
+        if self._resolution is None or self._direct_dependencies is None:
+            self._resolution, self._direct_dependencies = resolve_interpolations(
+                self._root
+            )
         return self
 
     def to_dict(self) -> dict[str, Any]:
         self.resolve()
         assert self._resolution is not None
-        return deepcopy(self._resolution.data)
+        return deepcopy(self._resolution)
 
     def to_toml(self) -> str:
         raise NotImplementedError("to_toml is reserved for future implementation")
@@ -60,17 +68,19 @@ class TomlStack:
     def _get_value(self, path: DataPath) -> Any:
         self.resolve()
         assert self._resolution is not None
-        return deepcopy(get_by_path(self._resolution.data, path))
+        return deepcopy(get_by_path(self._resolution, path))
 
     def _get_dependencies(self, path: DataPath) -> tuple[InterpolationDependency, ...]:
         self.resolve()
         assert self._resolution is not None
-        return self._resolution.direct_dependencies.get(path, ())
+        assert self._direct_dependencies is not None
+        return self._direct_dependencies.get(path, ())
 
     def _get_trace(self, path: DataPath) -> ResolutionTrace:
         self.resolve()
         assert self._resolution is not None
-        resolution = self._resolution
+        assert self._direct_dependencies is not None
+        direct_dependencies = self._direct_dependencies
         nodes: list[TraceNode] = []
         dependencies: list[InterpolationDependency] = []
         visited_paths: set[DataPath] = set()
@@ -81,7 +91,7 @@ class TomlStack:
             visited_paths.add(node_path)
             node = self._root._get_subnode(node_path)
             nodes.append(TraceNode(path=node_path, history=node.history))
-            direct = resolution.direct_dependencies.get(node_path, ())
+            direct = direct_dependencies.get(node_path, ())
             dependencies.extend(direct)
             for dependency in direct:
                 visit(dependency.source_path, include_descendants=True)
@@ -101,9 +111,10 @@ class TomlStack:
             root_path=path, nodes=tuple(nodes), dependencies=tuple(dependencies)
         )
 
-    def _subtree_has_dependencies(self, path: DataPath, node: _DataNode) -> bool:
+    def _subtree_has_dependencies(self, path: DataPath, node: DataNode) -> bool:
         assert self._resolution is not None
-        if path in self._resolution.direct_dependencies:
+        assert self._direct_dependencies is not None
+        if path in self._direct_dependencies:
             return True
         if isinstance(node.value, dict):
             return any(

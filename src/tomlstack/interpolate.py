@@ -13,11 +13,11 @@ from .errors import (
 from .path_expr import format_path_expr, parse_path_expr
 from .types import (
     ROOT_PATH,
+    DataNode,
     DataPath,
     InterpolationDependency,
     InterpolationKind,
     TomlFile,
-    _DataNode,
 )
 
 EXPR_RE = re.compile(r"\$\{([^{}]+)\}")
@@ -27,19 +27,15 @@ ALLOWED_EMBED_TYPES_STR = ", ".join(t.__name__ for t in ALLOWED_EMBED_TYPES)
 
 @dataclass
 class _InterpolationState:
-    raw_root: _DataNode
+    raw_root: DataNode
     resolved_cache: dict[DataPath, Any]
     resolving_stack: list[DataPath]
     direct_dependencies: dict[DataPath, list[InterpolationDependency]]
 
 
-@dataclass(frozen=True, slots=True)
-class _ResolutionResult:
-    data: dict[str, Any]
-    direct_dependencies: dict[DataPath, tuple[InterpolationDependency, ...]]
-
-
-def resolve_interpolations(raw_root: _DataNode) -> _ResolutionResult:
+def resolve_interpolations(
+    raw_root: DataNode,
+) -> tuple[dict[str, Any], dict[DataPath, tuple[InterpolationDependency, ...]]]:
     state = _InterpolationState(
         raw_root=raw_root,
         resolved_cache={},
@@ -48,16 +44,14 @@ def resolve_interpolations(raw_root: _DataNode) -> _ResolutionResult:
     )
     resolved = _resolve_node(raw_root, ROOT_PATH, state)
     assert isinstance(resolved, dict)
-    return _ResolutionResult(
-        data=resolved,
-        direct_dependencies={
-            path: tuple(dependencies)
-            for path, dependencies in state.direct_dependencies.items()
-        },
-    )
+    direct_dependencies = {
+        path: tuple(dependencies)
+        for path, dependencies in state.direct_dependencies.items()
+    }
+    return resolved, direct_dependencies
 
 
-def _resolve_node(node: _DataNode, path: DataPath, state: _InterpolationState) -> Any:
+def _resolve_node(node: DataNode, path: DataPath, state: _InterpolationState) -> Any:
     """Recursively resolve interpolations in a value"""
     if path in state.resolved_cache:
         return deepcopy(state.resolved_cache[path])

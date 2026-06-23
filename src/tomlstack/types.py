@@ -69,8 +69,8 @@ class ResolutionTrace:
 
 
 @dataclass(frozen=True, slots=True)
-class _DataNode:
-    value: _DataNodeValue
+class DataNode:
+    value: DataNodeValue
     history: tuple[TomlFile, ...]
     _materialized_cache: Any = field(
         init=False, default=None, repr=False, compare=False, hash=False
@@ -84,7 +84,7 @@ class _DataNode:
         return self._materialized_cache
 
     @classmethod
-    def _to_plain_value(cls, node: _DataNode) -> Any:
+    def _to_plain_value(cls, node: DataNode) -> Any:
         if isinstance(node.value, dict):
             return {
                 key: cls._to_plain_value(child) for key, child in node.value.items()
@@ -93,7 +93,7 @@ class _DataNode:
             return [cls._to_plain_value(child) for child in node.value]
         return node.value
 
-    def _get_subnode(self, path: DataPath) -> _DataNode:
+    def _get_subnode(self, path: DataPath) -> DataNode:
         node = self
         for part in path:
             if isinstance(part, str):
@@ -114,4 +114,4 @@ class _DataNode:
 
 
 TomlScalar: TypeAlias = str | int | float | bool | date | time | datetime
-_DataNodeValue: TypeAlias = TomlScalar | dict[str, _DataNode] | list[_DataNode]
+DataNodeValue: TypeAlias = TomlScalar | dict[str, DataNode] | list[DataNode]

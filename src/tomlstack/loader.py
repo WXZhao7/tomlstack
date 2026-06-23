@@ -11,10 +11,10 @@ from .errors import ContentError, IncludeCycleError
 from .include import IncludeSpec
 from .types import (
     CONFIG_TABLE,
+    DataNode,
+    DataNodeValue,
     IncludeNode,
     TomlFile,
-    _DataNode,
-    _DataNodeValue,
 )
 
 
@@ -28,7 +28,7 @@ class ParsedToml:
 
 @dataclass(frozen=True, slots=True)
 class _LoadedToml:
-    root: _DataNode
+    root: DataNode
     include_tree: IncludeNode
 
 
@@ -69,19 +69,19 @@ class _LoadContext:
 
 def load_toml_with_includes(
     root_file: str | PathLike[str],
-) -> tuple[_DataNode, IncludeNode]:
+) -> tuple[DataNode, IncludeNode]:
     abs_path = Path(root_file).expanduser().resolve()
     return _load_file(TomlFile(str_=str(root_file), path=abs_path), _LoadContext())
 
 
-def _load_file(entry: TomlFile, ctx: _LoadContext) -> tuple[_DataNode, IncludeNode]:
+def _load_file(entry: TomlFile, ctx: _LoadContext) -> tuple[DataNode, IncludeNode]:
 
     with ctx.enter_file(entry) as toml:
         current = _annotate(toml.data, entry)
         # Includes are merged in order; later includes override earlier ones.
         # The current file has the highest precedence.
         include_spec = IncludeSpec.from_toml(entry, toml.anchors)
-        merged = _DataNode(value={}, history=())
+        merged = DataNode(value={}, history=())
         children: list[IncludeNode] = []
         for raw_path in toml.includes:
             abs_path = include_spec.resolve_include_path(raw_path)
@@ -96,18 +96,18 @@ def _load_file(entry: TomlFile, ctx: _LoadContext) -> tuple[_DataNode, IncludeNo
         )
 
 
-def _annotate(value: Any, file: TomlFile) -> _DataNode:
-    annotated: _DataNodeValue
+def _annotate(value: Any, file: TomlFile) -> DataNode:
+    annotated: DataNodeValue
     if isinstance(value, dict):
         annotated = {key: _annotate(child, file) for key, child in value.items()}
     elif isinstance(value, list):
         annotated = [_annotate(child, file) for child in value]
     else:
         annotated = value
-    return _DataNode(value=annotated, history=(file,))
+    return DataNode(value=annotated, history=(file,))
 
 
-def _merge_nodes(low: _DataNode, high: _DataNode) -> _DataNode:
+def _merge_nodes(low: DataNode, high: DataNode) -> DataNode:
     """Merge two nodes with high priority overriding low priority."""
     history = low.history + high.history
     if isinstance(low.value, dict) and isinstance(high.value, dict):
@@ -117,8 +117,8 @@ def _merge_nodes(low: _DataNode, high: _DataNode) -> _DataNode:
                 merged[key] = _merge_nodes(merged[key], high_child)
             else:
                 merged[key] = high_child
-        return _DataNode(value=merged, history=history)
-    return _DataNode(value=high.value, history=history)
+        return DataNode(value=merged, history=history)
+    return DataNode(value=high.value, history=history)
 
 
 def parse_raw_file(path: Path) -> ParsedToml:
