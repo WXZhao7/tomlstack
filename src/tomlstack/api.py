@@ -11,6 +11,7 @@ from .nodes import Node
 from .path_expr import get_by_path
 from .types import (
     DataPath,
+    IncludeNode,
     InterpolationDependency,
     ResolutionTrace,
     TomlFile,
@@ -21,6 +22,7 @@ from .types import (
 @dataclass
 class TomlStack:
     _root: _DataNode
+    _include_tree: IncludeNode
     _resolution: _ResolutionResult | None = field(init=False, default=None)
 
     @property
@@ -60,9 +62,7 @@ class TomlStack:
         assert self._resolution is not None
         return deepcopy(get_by_path(self._resolution.data, path))
 
-    def _get_dependencies(
-        self, path: DataPath
-    ) -> tuple[InterpolationDependency, ...]:
+    def _get_dependencies(self, path: DataPath) -> tuple[InterpolationDependency, ...]:
         self.resolve()
         assert self._resolution is not None
         return self._resolution.direct_dependencies.get(path, ())
@@ -117,23 +117,11 @@ class TomlStack:
             )
         return False
 
-    def include_tree(self, level: int = 0, absolute: bool = False): ...
-
-    #
-    # main.toml
-    # ├─ ./a.toml
-    # │  └─ @root/base.toml
-    # ├─ /abs/path/c.toml
-    # │  └─ @root/base.toml
-    # └─ ./b.toml
-    #    └─ @root/base.toml
-    #
-    # main.toml -> /abs/project/main.toml
-    # ├─ ./a.toml  -> /abs/path/a.toml
-    # │  └─ @root/base.toml -> /abs/shared/base.toml
-    # └─ ./b.toml  -> /abs/path/b.toml
-    #    └─ @root/base.toml -> /abs/shared/base.toml
+    @property
+    def include_tree(self) -> IncludeNode:
+        return self._include_tree
 
 
 def load(path: str | PathLike[str]) -> TomlStack:
-    return TomlStack(_root=load_toml_with_includes(path))
+    root, include_tree = load_toml_with_includes(path)
+    return TomlStack(_root=root, _include_tree=include_tree)

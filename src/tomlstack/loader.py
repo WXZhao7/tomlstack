@@ -11,6 +11,7 @@ from .errors import ContentError, IncludeCycleError
 from .include import IncludeSpec
 from .types import (
     CONFIG_TABLE,
+    IncludeNode,
     TomlFile,
     _DataNode,
     _DataNodeValue,
@@ -23,6 +24,12 @@ class ParsedToml:
     includes: list[str]
     anchors: dict[str, str]
     data: dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
+class _LoadedToml:
+    root: _DataNode
+    include_tree: IncludeNode
 
 
 @dataclass
@@ -60,26 +67,33 @@ class _LoadContext:
                 raise IncludeCycleError(render_cycle_include())
 
 
-def load_toml_with_includes(root_file: str | PathLike[str]) -> _DataNode:
+def load_toml_with_includes(
+    root_file: str | PathLike[str],
+) -> tuple[_DataNode, IncludeNode]:
     abs_path = Path(root_file).expanduser().resolve()
     return _load_file(TomlFile(str_=str(root_file), path=abs_path), _LoadContext())
 
 
-def _load_file(entry: TomlFile, ctx: _LoadContext) -> _DataNode:
+def _load_file(entry: TomlFile, ctx: _LoadContext) -> tuple[_DataNode, IncludeNode]:
 
     with ctx.enter_file(entry) as toml:
         current = _annotate(toml.data, entry)
-        if not toml.includes:
-            return current
         # Includes are merged in order; later includes override earlier ones.
         # The current file has the highest precedence.
         include_spec = IncludeSpec.from_toml(entry, toml.anchors)
         merged = _DataNode(value={}, history=())
+        children: list[IncludeNode] = []
         for raw_path in toml.includes:
             abs_path = include_spec.resolve_include_path(raw_path)
-            included = _load_file(TomlFile(str_=raw_path, path=abs_path), ctx)
-            merged = _merge_nodes(merged, included)
-        return _merge_nodes(merged, current)
+            _root, _include_tree = _load_file(
+                TomlFile(str_=raw_path, path=abs_path), ctx
+            )
+            merged = _merge_nodes(merged, _root)
+            children.append(_include_tree)
+        return (
+            _merge_nodes(merged, current),
+            IncludeNode(file=entry, children=tuple(children)),
+        )
 
 
 def _annotate(value: Any, file: TomlFile) -> _DataNode:

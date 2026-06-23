@@ -3,6 +3,7 @@
 `tomlstack` is a lightweight TOML config loader for Python 3.11+ with:
 
 - top-level `include` loading
+- include-tree inspection with raw and resolved paths
 - deterministic merge by include order
 - `${path}` interpolation with cycle/undefined checks
 - node-level provenance (`origin`, `history`, `dependencies`)
@@ -111,6 +112,9 @@ Conflict behavior:
 - `cfg.resolved` — resolved configuration snapshot
 - `cfg.resolve()`
 - `cfg.to_dict()` — equivalent to `cfg.resolved`
+- `cfg.include_tree` — `IncludeNode` load-occurrence tree
+- `cfg.include_tree.render()` — render raw include references
+- `cfg.include_tree.render(absolute=True)` — include references with resolved paths
 - `node = cfg["proj"][0]["path"]["foo"]`
 - `node.raw`
 - `node.value`

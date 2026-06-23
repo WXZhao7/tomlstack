@@ -14,7 +14,7 @@ ports = [8000, 8001]
         encoding="utf-8",
     )
 
-    root = load_toml_with_includes(path)
+    root, include_tree = load_toml_with_includes(path)
 
     def assert_node_tree(node: _DataNode) -> None:
         assert isinstance(node.history, tuple)

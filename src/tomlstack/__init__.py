@@ -1,7 +1,8 @@
 from .api import TomlStack, load
-from .types import InterpolationDependency, ResolutionTrace, TraceNode
+from .types import IncludeNode, InterpolationDependency, ResolutionTrace, TraceNode
 
 __all__ = [
+    "IncludeNode",
     "InterpolationDependency",
     "ResolutionTrace",
     "TomlStack",

@@ -45,6 +45,65 @@ host = "main"
     }
 
 
+def test_include_tree_preserves_occurrences_order_and_rendering(tmp_path: Path) -> None:
+    (tmp_path / "shared.toml").write_text("value = 1\n", encoding="utf-8")
+    (tmp_path / "a.toml").write_text(
+        "include = './shared.toml'\na = true\n", encoding="utf-8"
+    )
+    (tmp_path / "b.toml").write_text(
+        "include = './shared.toml'\nb = true\n", encoding="utf-8"
+    )
+    main = tmp_path / "main.toml"
+    main.write_text(
+        "include = ['./a.toml', './b.toml']\n", encoding="utf-8"
+    )
+
+    tree = load(main).include_tree
+
+    assert tree.file.path == main.resolve()
+    assert [child.file.str_ for child in tree.children] == ["./a.toml", "./b.toml"]
+    assert tree.children[0].children[0].file.str_ == "./shared.toml"
+    assert tree.children[1].children[0].file.str_ == "./shared.toml"
+    assert tree.render() == "\n".join(
+        [
+            str(main),
+            "├── ./a.toml",
+            "│   └── ./shared.toml",
+            "└── ./b.toml",
+            "    └── ./shared.toml",
+        ]
+    )
+    assert tree.render(absolute=True) == "\n".join(
+        [
+            f"{main} -> {main.resolve()}",
+            f"├── ./a.toml -> {(tmp_path / 'a.toml').resolve()}",
+            f"│   └── ./shared.toml -> {(tmp_path / 'shared.toml').resolve()}",
+            f"└── ./b.toml -> {(tmp_path / 'b.toml').resolve()}",
+            f"    └── ./shared.toml -> {(tmp_path / 'shared.toml').resolve()}",
+        ]
+    )
+
+
+def test_include_tree_records_anchor_reference_and_leaf(tmp_path: Path) -> None:
+    shared = tmp_path / "shared"
+    project = tmp_path / "project"
+    shared.mkdir()
+    project.mkdir()
+    (shared / "base.toml").write_text("value = 1\n", encoding="utf-8")
+    main = project / "main.toml"
+    main.write_text(
+        "include = '@root/base.toml'\n[tomlstack.anchors]\nroot = '../shared'\n",
+        encoding="utf-8",
+    )
+
+    tree = load(main).include_tree
+
+    assert len(tree.children) == 1
+    assert tree.children[0].file.str_ == "@root/base.toml"
+    assert tree.children[0].file.path == (shared / "base.toml").resolve()
+    assert tree.children[0].children == ()
+
+
 def test_replacing_list_discards_replaced_element_history(tmp_path: Path) -> None:
     (tmp_path / "base.toml").write_text(
         """\
