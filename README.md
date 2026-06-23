@@ -5,7 +5,7 @@
 - top-level `include` loading
 - deterministic merge by include order
 - `${path}` interpolation with cycle/undefined checks
-- node-level provenance (`origin`, `history`)
+- node-level provenance (`origin`, `history`, `dependencies`)
 
 tomlstack does not try to be a configuration framework.
 It address two missing pieces to TOML: file composition and safe interpolation — while keeping files self-contained and explainable.
@@ -50,6 +50,8 @@ print(cfg["db"]["url"].raw)    # raw interpolation string
 print(cfg["db"]["url"].value)  # resolved value
 print(cfg["db"]["url"].origin)
 print(cfg["db"]["url"].history)
+print(cfg["db"]["url"].dependencies)
+print(cfg["db"]["url"].explain())
 print(cfg.raw)                   # raw configuration snapshot
 print(cfg.resolved)              # resolved configuration snapshot
 ```
@@ -114,6 +116,8 @@ Conflict behavior:
 - `node.value`
 - `node.origin`
 - `node.history`
+- `node.dependencies` — direct interpolation dependencies
+- `node.explain()` — transitive interpolation trace
 - `node.preview()`
 - `cfg.to_toml()` -> `NotImplementedError`
 
@@ -124,6 +128,10 @@ loaded configuration.
 History records definitions of the same data path from lowest to highest priority.
 When a list or value type is replaced, its old child paths are discarded. Resolving an
 interpolation does not change the history of the node containing the expression.
+
+Dependencies describe interpolation separately from merge history. A full replacement
+such as `target = "${source}"` leaves `target.history` at the file that defined
+`target`, while `target.dependencies` records the source path and its history.
 
 ## Current Limitations
 

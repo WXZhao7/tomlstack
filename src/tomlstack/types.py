@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from pathlib import Path
-from typing import Any, TypeAlias
+from typing import Any, Literal, TypeAlias
 
 DataPath = tuple[str | int, ...]
 
@@ -21,6 +21,32 @@ class TomlFile:
 class TomlHist:
     file: TomlFile
     depth: int
+
+
+InterpolationKind: TypeAlias = Literal["replace", "format", "embed"]
+
+
+@dataclass(frozen=True, slots=True)
+class InterpolationDependency:
+    target_path: DataPath
+    source_path: DataPath
+    expression: str
+    kind: InterpolationKind
+    format_spec: str | None
+    source_history: tuple[TomlHist, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class TraceNode:
+    path: DataPath
+    history: tuple[TomlHist, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ResolutionTrace:
+    root_path: DataPath
+    nodes: tuple[TraceNode, ...]
+    dependencies: tuple[InterpolationDependency, ...]
 
 
 @dataclass(frozen=True, slots=True)
