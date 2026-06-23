@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from .types import DataPath, InterpolationDependency, ResolutionTrace, TomlHist
+from .types import DataPath, InterpolationDependency, ResolutionTrace, TomlFile
 
 
 @dataclass
@@ -30,11 +30,11 @@ class Node:
         return self.value
 
     @property
-    def origin(self) -> TomlHist:
+    def origin(self) -> TomlFile:
         return self.history[-1]
 
     @property
-    def history(self) -> tuple[TomlHist, ...]:
+    def history(self) -> tuple[TomlFile, ...]:
         return self._cfg._get_history(self.key)
 
     @property
@@ -75,7 +75,7 @@ class ConfigProtocol(Protocol):
 
     def _get_value(self, path: DataPath) -> Any: ...
 
-    def _get_history(self, path: DataPath) -> tuple[TomlHist, ...]: ...
+    def _get_history(self, path: DataPath) -> tuple[TomlFile, ...]: ...
 
     def _get_dependencies(
         self, path: DataPath

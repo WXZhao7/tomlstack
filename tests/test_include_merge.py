@@ -63,11 +63,11 @@ items = ['main-0']
     cfg = load(tmp_path / "main.toml")
 
     assert cfg["items"].raw == ["main-0"]
-    assert [hist.file.str_ for hist in cfg["items"].history] == [
+    assert [hist.str_ for hist in cfg["items"].history] == [
         "./base.toml",
         str(tmp_path / "main.toml"),
     ]
-    assert [hist.file.str_ for hist in cfg["items"][0].history] == [
+    assert [hist.str_ for hist in cfg["items"][0].history] == [
         str(tmp_path / "main.toml")
     ]
     with pytest.raises(IndexError):
@@ -93,7 +93,7 @@ value = 'main'
     cfg = load(tmp_path / "main.toml")
 
     assert cfg["value"].raw == "main"
-    assert [hist.file.str_ for hist in cfg["value"].history] == [
+    assert [hist.str_ for hist in cfg["value"].history] == [
         "./base.toml",
         str(tmp_path / "main.toml"),
     ]
@@ -121,11 +121,11 @@ new = 'main'
 
     cfg = load(tmp_path / "main.toml")
 
-    assert [hist.file.str_ for hist in cfg["value"].history] == [
+    assert [hist.str_ for hist in cfg["value"].history] == [
         "./base.toml",
         str(tmp_path / "main.toml"),
     ]
-    assert [hist.file.str_ for hist in cfg["value"]["new"].history] == [
+    assert [hist.str_ for hist in cfg["value"]["new"].history] == [
         str(tmp_path / "main.toml")
     ]
 
@@ -169,22 +169,22 @@ port = 8080
             "port": 8080,
         }
     }
-    assert [item.file.str_ for item in cfg["service"].history] == [
+    assert [item.str_ for item in cfg["service"].history] == [
         "./base.toml",
         "./overlay.toml",
         str(tmp_path / "main.toml"),
     ]
-    assert [item.file.str_ for item in cfg["service"]["host"].history] == [
+    assert [item.str_ for item in cfg["service"]["host"].history] == [
         "./base.toml",
         "./overlay.toml",
     ]
-    assert [item.file.str_ for item in cfg["service"]["auth"]["user"].history] == [
+    assert [item.str_ for item in cfg["service"]["auth"]["user"].history] == [
         "./base.toml"
     ]
-    assert [item.file.str_ for item in cfg["service"]["auth"]["password"].history] == [
+    assert [item.str_ for item in cfg["service"]["auth"]["password"].history] == [
         "./overlay.toml"
     ]
-    assert [item.file.str_ for item in cfg["service"]["port"].history] == [
+    assert [item.str_ for item in cfg["service"]["port"].history] == [
         str(tmp_path / "main.toml")
     ]
 
@@ -218,12 +218,12 @@ current = 'main'
     cfg = load(tmp_path / "main.toml")
 
     assert cfg["value"].raw == {"current": "main"}
-    assert [item.file.str_ for item in cfg["value"].history] == [
+    assert [item.str_ for item in cfg["value"].history] == [
         "./base.toml",
         "./middle.toml",
         str(tmp_path / "main.toml"),
     ]
-    assert [item.file.str_ for item in cfg["value"]["current"].history] == [
+    assert [item.str_ for item in cfg["value"]["current"].history] == [
         str(tmp_path / "main.toml")
     ]
     with pytest.raises(KeyError):
@@ -251,11 +251,11 @@ include = './base.toml'
     cfg = load(tmp_path / "main.toml")
 
     assert cfg["service"].raw == {"host": "base"}
-    assert [item.file.str_ for item in cfg["service"].history] == [
+    assert [item.str_ for item in cfg["service"].history] == [
         "./base.toml",
         str(tmp_path / "main.toml"),
     ]
-    assert [item.file.str_ for item in cfg["service"]["host"].history] == [
+    assert [item.str_ for item in cfg["service"]["host"].history] == [
         "./base.toml"
     ]
 
@@ -293,11 +293,10 @@ include = ['./a.toml', './b.toml']
     cfg = load(tmp_path / "main.toml")
 
     assert cfg.to_dict() == {"value": 1, "a": True, "b": True}
-    assert [item.file.str_ for item in cfg["value"].history] == [
+    assert [item.str_ for item in cfg["value"].history] == [
         "./shared.toml",
         "./shared.toml",
     ]
-    assert [item.depth for item in cfg["value"].history] == [3, 3]
 
 
 def test_relative_include_and_anchor_include(tmp_path: Path) -> None:

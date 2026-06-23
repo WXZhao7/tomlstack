@@ -16,7 +16,7 @@ from .types import (
     DataPath,
     InterpolationDependency,
     InterpolationKind,
-    TomlHist,
+    TomlFile,
     _DataNode,
 )
 
@@ -193,7 +193,7 @@ def _record_dependency(
     expression: str,
     kind: InterpolationKind,
     format_spec: str | None,
-    source_history: tuple[TomlHist, ...],
+    source_history: tuple[TomlFile, ...],
     state: _InterpolationState,
 ) -> None:
     state.direct_dependencies.setdefault(target_path, []).append(

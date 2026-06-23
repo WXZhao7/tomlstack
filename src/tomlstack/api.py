@@ -13,7 +13,7 @@ from .types import (
     DataPath,
     InterpolationDependency,
     ResolutionTrace,
-    TomlHist,
+    TomlFile,
     TraceNode,
 )
 
@@ -52,7 +52,7 @@ class TomlStack:
     def _get_raw(self, path: DataPath) -> Any:
         return deepcopy(self._root._get_subnode(path).materialized)
 
-    def _get_history(self, path: DataPath) -> tuple[TomlHist, ...]:
+    def _get_history(self, path: DataPath) -> tuple[TomlFile, ...]:
         return self._root._get_subnode(path).history
 
     def _get_value(self, path: DataPath) -> Any:

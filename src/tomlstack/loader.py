@@ -12,7 +12,6 @@ from .include import IncludeSpec
 from .types import (
     CONFIG_TABLE,
     TomlFile,
-    TomlHist,
     _DataNode,
     _DataNodeValue,
 )
@@ -30,10 +29,6 @@ class ParsedToml:
 class _LoadContext:
     file_stack: list[TomlFile] = field(default_factory=list)
     # current include stack for cycle detection
-
-    @property
-    def depth(self) -> int:
-        return len(self.file_stack)
 
     def _render_include_chain(self) -> str:
         return "\n".join(f"\t{f.str_} -> {f.path}" for f in self.file_stack)
@@ -73,7 +68,7 @@ def load_toml_with_includes(root_file: str | PathLike[str]) -> _DataNode:
 def _load_file(entry: TomlFile, ctx: _LoadContext) -> _DataNode:
 
     with ctx.enter_file(entry) as toml:
-        current = _annotate(toml.data, TomlHist(file=entry, depth=ctx.depth))
+        current = _annotate(toml.data, entry)
         if not toml.includes:
             return current
         # Includes are merged in order; later includes override earlier ones.
@@ -87,15 +82,15 @@ def _load_file(entry: TomlFile, ctx: _LoadContext) -> _DataNode:
         return _merge_nodes(merged, current)
 
 
-def _annotate(value: Any, hist: TomlHist) -> _DataNode:
+def _annotate(value: Any, file: TomlFile) -> _DataNode:
     annotated: _DataNodeValue
     if isinstance(value, dict):
-        annotated = {key: _annotate(child, hist) for key, child in value.items()}
+        annotated = {key: _annotate(child, file) for key, child in value.items()}
     elif isinstance(value, list):
-        annotated = [_annotate(child, hist) for child in value]
+        annotated = [_annotate(child, file) for child in value]
     else:
         annotated = value
-    return _DataNode(value=annotated, history=(hist,))
+    return _DataNode(value=annotated, history=(file,))
 
 
 def _merge_nodes(low: _DataNode, high: _DataNode) -> _DataNode:

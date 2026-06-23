@@ -17,12 +17,6 @@ class TomlFile:
     path: Path  # resolved absolute path
 
 
-@dataclass(frozen=True, slots=True)
-class TomlHist:
-    file: TomlFile
-    depth: int
-
-
 InterpolationKind: TypeAlias = Literal["replace", "format", "embed"]
 
 
@@ -33,13 +27,13 @@ class InterpolationDependency:
     expression: str
     kind: InterpolationKind
     format_spec: str | None
-    source_history: tuple[TomlHist, ...]
+    source_history: tuple[TomlFile, ...]
 
 
 @dataclass(frozen=True, slots=True)
 class TraceNode:
     path: DataPath
-    history: tuple[TomlHist, ...]
+    history: tuple[TomlFile, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,7 +46,7 @@ class ResolutionTrace:
 @dataclass(frozen=True, slots=True)
 class _DataNode:
     value: _DataNodeValue
-    history: tuple[TomlHist, ...]
+    history: tuple[TomlFile, ...]
     _materialized_cache: Any = field(
         init=False, default=None, repr=False, compare=False, hash=False
     )

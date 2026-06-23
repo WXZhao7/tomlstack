@@ -34,15 +34,12 @@ host='main'
     assert host_node.raw == "main"
     assert host_node.value == "main"
     # assert host_node.origin == str((tmp_path / "main.toml").resolve())
-    assert host_node.history[0].file.str_ == "./a.toml"
-    assert host_node.history[0].file.path == (tmp_path / "a.toml").resolve()
-    assert host_node.history[0].depth == 2
-    assert host_node.history[1].file.str_ == "./b.toml"
-    assert host_node.history[1].file.path == (tmp_path / "b.toml").resolve()
-    assert host_node.history[1].depth == 2
-    assert host_node.history[2].file.str_ == str(tmp_path / "main.toml")
-    assert host_node.history[2].file.path == (tmp_path / "main.toml").resolve()
-    assert host_node.history[2].depth == 1
+    assert host_node.history[0].str_ == "./a.toml"
+    assert host_node.history[0].path == (tmp_path / "a.toml").resolve()
+    assert host_node.history[1].str_ == "./b.toml"
+    assert host_node.history[1].path == (tmp_path / "b.toml").resolve()
+    assert host_node.history[2].str_ == str(tmp_path / "main.toml")
+    assert host_node.history[2].path == (tmp_path / "main.toml").resolve()
 
 
 def test_list_index_access_and_preview(tmp_path: Path) -> None:

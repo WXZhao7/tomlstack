@@ -51,8 +51,8 @@ target = '${source}'
 
     assert cfg["target"].raw == "${source}"
     assert cfg["target"].value == 42
-    assert cfg["target"].origin.file.str_ == str(tmp_path / "main.toml")
-    assert cfg["source"].origin.file.str_ == "./base.toml"
+    assert cfg["target"].origin.str_ == str(tmp_path / "main.toml")
+    assert cfg["source"].origin.str_ == "./base.toml"
 
 
 def test_replace_dependency_keeps_target_history_separate(tmp_path: Path) -> None:
@@ -70,7 +70,7 @@ target = '${source}'
     target = cfg["target"]
 
     assert target.value == 2
-    assert [item.file.str_ for item in target.history] == [str(tmp_path / "main.toml")]
+    assert [item.str_ for item in target.history] == [str(tmp_path / "main.toml")]
     dependency = target.dependencies[0]
     assert isinstance(dependency, InterpolationDependency)
     assert dependency.target_path == ("target",)
@@ -78,7 +78,7 @@ target = '${source}'
     assert dependency.expression == "${source}"
     assert dependency.kind == "replace"
     assert dependency.format_spec is None
-    assert [item.file.str_ for item in dependency.source_history] == [
+    assert [item.str_ for item in dependency.source_history] == [
         "./base.toml",
         "./prod.toml",
     ]
@@ -203,11 +203,11 @@ url = 'port=${port}'
     cfg = load(tmp_path / "main.toml")
 
     assert cfg["url"].value == "port=2000"
-    assert [item.file.str_ for item in cfg["port"].history] == [
+    assert [item.str_ for item in cfg["port"].history] == [
         "./base.toml",
         "./prod.toml",
     ]
-    assert cfg["url"].origin.file.str_ == str(tmp_path / "main.toml")
+    assert cfg["url"].origin.str_ == str(tmp_path / "main.toml")
 
 
 def test_full_interpolation_of_complex_values_does_not_alias_results(
