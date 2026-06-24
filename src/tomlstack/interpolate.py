@@ -41,7 +41,7 @@ class _ResolutionResult:
     direct_dependencies: dict[DataPath, tuple[InterpolationDependency, ...]]
 
 
-def resolve_interpolations(raw_root: _DataNode) -> _ResolutionResult:
+def _resolve_interpolations(raw_root: _DataNode) -> _ResolutionResult:
     state = _InterpolationState(
         raw_root=raw_root,
         resolved_cache={},

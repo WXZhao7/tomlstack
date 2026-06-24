@@ -8,13 +8,13 @@ from pathlib import Path
 from typing import Any
 
 from .errors import ContentError, IncludeCycleError, TomlFormatError
-from .include import IncludeSpec
+from .include import _IncludeResolver
 from .tree import _DataNode, _DataNodeValue
 from .types import CONFIG_TABLE, IncludeNode, TomlFile
 
 
 @dataclass(frozen=True, slots=True)
-class ParsedToml:
+class _ParsedToml:
     includes: list[str]
     anchors: dict[str, str]
     data: dict[str, Any]
@@ -39,7 +39,7 @@ class _LoadContext:
     @contextmanager
     def enter_file(self, entry: TomlFile):
         self._validate_cycle_include(entry)
-        toml = parse_raw_file(entry.path)
+        toml = _parse_raw_file(entry.path)
 
         self.file_stack.append(entry)
         try:
@@ -63,7 +63,7 @@ class _LoadContext:
                 raise IncludeCycleError(render_cycle_include())
 
 
-def load_toml_with_includes(
+def _load_toml_with_includes(
     root_file: str | PathLike[str],
 ) -> _LoadedToml:
     abs_path = Path(root_file).expanduser().resolve()
@@ -78,11 +78,11 @@ def _load_file(entry: TomlFile, ctx: _LoadContext) -> _LoadedToml:
         current = _annotate(toml.data, entry)
         # Includes are merged in order; later includes override earlier ones.
         # The current file has the highest precedence.
-        include_spec = IncludeSpec.from_toml(entry, toml.anchors)
+        include_resolver = _IncludeResolver.from_toml(entry, toml.anchors)
         merged = _DataNode(value={}, history=())
         children: list[IncludeNode] = []
         for raw_path in toml.includes:
-            abs_path = include_spec.resolve_include_path(raw_path)
+            abs_path = include_resolver.resolve_include_path(raw_path)
             included = _load_file(
                 TomlFile(reference=raw_path, path=abs_path), ctx
             )
@@ -119,7 +119,7 @@ def _merge_nodes(low: _DataNode, high: _DataNode) -> _DataNode:
     return _DataNode(value=high.value, history=history)
 
 
-def parse_raw_file(path: Path) -> ParsedToml:
+def _parse_raw_file(path: Path) -> _ParsedToml:
     try:
         with path.open("rb") as f:
             data = tomllib.load(f)
@@ -157,4 +157,4 @@ def parse_raw_file(path: Path) -> ParsedToml:
     else:
         raise ContentError(f"Invalid anchors specification in {path}")
 
-    return ParsedToml(includes=includes, anchors=anchors, data=data)
+    return _ParsedToml(includes=includes, anchors=anchors, data=data)

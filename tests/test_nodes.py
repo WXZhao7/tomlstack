@@ -1,6 +1,8 @@
 from pathlib import Path
 
-from tomlstack import load
+import pytest
+
+from tomlstack import TomlNode, load
 
 
 def test_node_access_origin_and_explain(tmp_path: Path) -> None:
@@ -31,6 +33,8 @@ host='main'
     cfg = load(tmp_path / "main.toml")
     host_node = cfg["db"]["host"]
 
+    assert isinstance(host_node, TomlNode)
+    assert host_node.path == ("db", "host")
     assert host_node.raw == "main"
     assert host_node.value == "main"
     # assert host_node.origin == str((tmp_path / "main.toml").resolve())
@@ -81,3 +85,8 @@ def test_node_raw_returns_an_independent_snapshot(tmp_path: Path) -> None:
 
     assert node.raw == [1, 2]
     assert node[1].raw == 2
+
+
+def test_toml_node_cannot_be_constructed_directly() -> None:
+    with pytest.raises(TypeError, match="TomlStack navigation"):
+        TomlNode()

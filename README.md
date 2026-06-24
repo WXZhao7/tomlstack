@@ -55,7 +55,7 @@ print(cfg["db"]["url"].history)
 print(cfg["db"]["url"].dependencies)
 print(cfg["db"]["url"].explain())
 print(cfg.raw)                   # raw configuration snapshot
-print(cfg.resolved)              # resolved configuration snapshot
+print(cfg.to_dict())             # resolved configuration snapshot
 ```
 
 ## Include Semantics
@@ -95,8 +95,8 @@ Conflict behavior:
 
 ## Interpolation Semantics
 
-- interpolation is resolved lazily by `cfg.resolve()`, `cfg.to_dict()`,
-  `cfg.resolved`, or `node.value`
+- interpolation is resolved lazily by `cfg.resolve()`, `cfg.to_dict()`, or
+  `node.value`
 - path syntax supports dot and list index: `${db.apps[0]}`
 - full-string interpolation (`"${db.port}"`) keeps source type
 - embedded interpolation (`"postgres://${db.host}:${db.port}"`) allows only:
@@ -115,13 +115,12 @@ Invalid TOML raises `TomlFormatError`; invalid include paths and anchors raise
 
 - `cfg = load("f.toml")`
 - `cfg.raw` — raw configuration snapshot
-- `cfg.resolved` — resolved configuration snapshot
 - `cfg.resolve()`
-- `cfg.to_dict()` — equivalent to `cfg.resolved`
+- `cfg.to_dict()` — resolved configuration snapshot
 - `cfg.include_tree` — `IncludeNode` load-occurrence tree
 - `cfg.include_tree.render()` — render raw include references
 - `cfg.include_tree.render(absolute=True)` — include references with resolved paths
-- `node = cfg["proj"][0]["path"]["foo"]`
+- `node: TomlNode = cfg["proj"][0]["path"]["foo"]`
 - `node.raw`
 - `node.value`
 - `node.origin`
@@ -131,9 +130,10 @@ Invalid TOML raises `TomlFormatError`; invalid include paths and anchors raise
 - `node.preview()`
 - `cfg.to_toml()` -> `NotImplementedError`
 
-`cfg.raw`, `cfg.resolved`, `cfg.to_dict()`, `node.raw`, and `node.value` return
-independent data snapshots; mutating their dictionaries or lists does not modify the
-loaded configuration.
+`cfg.raw`, `cfg.to_dict()`, `node.raw`, and `node.value` return independent data
+snapshots; mutating their dictionaries or lists does not modify the loaded
+configuration. `TomlNode` instances are created by configuration navigation and are
+not constructed directly.
 
 History records definitions of the same data path from lowest to highest priority.
 When a list or value type is replaced, its old child paths are discarded. Resolving an
@@ -150,10 +150,6 @@ such as `target = "${source}"` leaves `target.history` at the file that defined
 - interpolation path parser supports unquoted dot keys and numeric list indices
 - no nested interpolation expressions
 - `to_toml()` is not implemented yet
-
-## TODO
-
-- [ ] review the details of interpolation
 
 ## Release To PyPI
 

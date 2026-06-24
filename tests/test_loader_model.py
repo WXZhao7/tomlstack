@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from tomlstack.loader import load_toml_with_includes
+from tomlstack.loader import _load_toml_with_includes
 from tomlstack.tree import _DataNode
 
 
@@ -15,7 +15,7 @@ ports = [8000, 8001]
         encoding="utf-8",
     )
 
-    root = load_toml_with_includes(path).root
+    root = _load_toml_with_includes(path).root
 
     def assert_node_tree(node: _DataNode) -> None:
         assert isinstance(node.history, tuple)

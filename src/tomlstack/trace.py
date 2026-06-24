@@ -9,7 +9,7 @@ from .types import (
 )
 
 
-def build_resolution_trace(
+def _build_resolution_trace(
     root: _DataNode,
     root_path: DataPath,
     direct_dependencies: dict[DataPath, tuple[InterpolationDependency, ...]],
