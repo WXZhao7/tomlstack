@@ -67,9 +67,7 @@ def _load_toml_with_includes(
     root_file: str | PathLike[str],
 ) -> _LoadedToml:
     abs_path = Path(root_file).expanduser().resolve()
-    return _load_file(
-        TomlFile(reference=str(root_file), path=abs_path), _LoadContext()
-    )
+    return _load_file(TomlFile(reference=str(root_file), path=abs_path), _LoadContext())
 
 
 def _load_file(entry: TomlFile, ctx: _LoadContext) -> _LoadedToml:
@@ -83,9 +81,7 @@ def _load_file(entry: TomlFile, ctx: _LoadContext) -> _LoadedToml:
         children: list[IncludeNode] = []
         for raw_path in toml.includes:
             abs_path = include_resolver.resolve_include_path(raw_path)
-            included = _load_file(
-                TomlFile(reference=raw_path, path=abs_path), ctx
-            )
+            included = _load_file(TomlFile(reference=raw_path, path=abs_path), ctx)
             merged = _merge_nodes(merged, included.root)
             children.append(included.include_tree)
         return _LoadedToml(

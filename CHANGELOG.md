@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on Keep a Changelog,
 and this project follows Semantic Versioning.
 
+## [0.2.0] - 2026-06-24
+
+### Added
+
+- Include-tree inspection through `cfg.include_tree`.
+- Node provenance and interpolation dependency inspection through `TomlNode`.
+- Specific errors for invalid TOML, undefined interpolation references, and
+  interpolation cycles.
+
+### Changed
+
+- Configuration loading now binds each value to its source history internally,
+  making merge and interpolation provenance consistent.
+- `TomlNode` is the public node-query type; nodes and `TomlStack` instances are
+  created through configuration loading and navigation only.
+
+### Removed
+
+- `TomlStack.view`; use `cfg.raw` for unexpanded data or `cfg.to_dict()` for a
+  resolved snapshot.
+- `TomlStack.to_dict(resolve=False)`; use `cfg.raw`.
+- `TomlHist` and `TomlFile.str_`; history now contains `TomlFile` values with
+  `reference` and resolved `path` fields.
+- Legacy metadata/version directives and their associated error classes.
+
 ## [0.1.2] - 2026-03-01
 
 - first publish version

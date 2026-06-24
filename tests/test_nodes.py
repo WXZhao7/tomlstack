@@ -75,9 +75,7 @@ def test_to_dict_resolve_flag(tmp_path: Path) -> None:
 
 
 def test_node_raw_returns_an_independent_snapshot(tmp_path: Path) -> None:
-    (tmp_path / "main.toml").write_text(
-        "items = [1, 2]\n", encoding="utf-8"
-    )
+    (tmp_path / "main.toml").write_text("items = [1, 2]\n", encoding="utf-8")
 
     node = load(tmp_path / "main.toml")["items"]
     raw = node.raw

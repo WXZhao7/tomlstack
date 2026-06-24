@@ -54,9 +54,7 @@ def test_include_tree_preserves_occurrences_order_and_rendering(tmp_path: Path) 
         "include = './shared.toml'\nb = true\n", encoding="utf-8"
     )
     main = tmp_path / "main.toml"
-    main.write_text(
-        "include = ['./a.toml', './b.toml']\n", encoding="utf-8"
-    )
+    main.write_text("include = ['./a.toml', './b.toml']\n", encoding="utf-8")
 
     tree = load(main).include_tree
 
@@ -427,9 +425,7 @@ def test_invalid_include_format_error(tmp_path: Path) -> None:
 
 def test_invalid_anchor_path_raises_include_error(tmp_path: Path) -> None:
     path = tmp_path / "main.toml"
-    path.write_text(
-        "[tomlstack.anchors]\nroot = 'shared'\n", encoding="utf-8"
-    )
+    path.write_text("[tomlstack.anchors]\nroot = 'shared'\n", encoding="utf-8")
 
     with pytest.raises(IncludeError, match="Invalid anchor path"):
         load(path)

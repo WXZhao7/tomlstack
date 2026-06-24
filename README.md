@@ -45,7 +45,7 @@ port = 5432
 Python:
 
 ```python
-from tomlstack import load
+from tomlstack import TomlNode, load
 
 cfg = load("main.toml")
 print(cfg["db"]["url"].raw)    # raw interpolation string

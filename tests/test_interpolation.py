@@ -291,9 +291,7 @@ b = '${a}'
 
 
 def test_invalid_interpolation_path_raises_interpolation_error(tmp_path: Path) -> None:
-    (tmp_path / "main.toml").write_text(
-        "x = '${missing..key}'\n", encoding="utf-8"
-    )
+    (tmp_path / "main.toml").write_text("x = '${missing..key}'\n", encoding="utf-8")
 
     with pytest.raises(InterpolationError, match="Invalid interpolation path"):
         load(tmp_path / "main.toml").resolve()
