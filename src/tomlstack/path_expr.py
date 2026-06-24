@@ -38,6 +38,7 @@ def parse_path_expr_match(expr: str) -> DataPath:
 
 
 def parse_path_expr_scan(expr: str) -> DataPath:
+    # another implementation of the path expression parser.
     if not expr:
         raise DataPathError("Empty interpolation path")
 
@@ -98,7 +99,7 @@ def parse_path_expr(expr: str) -> DataPath:
     :param expr: The path expression to parse
     :type expr: str
     :return: The parsed path
-    :rtype: PathKey
+    :rtype: DataPath
     """
     return parse_path_expr_match(expr)
 
@@ -114,7 +115,7 @@ def format_path_expr(path: DataPath) -> str:
         ("foo", 0, 1, "bar") -> "foo[0][1].bar"
 
     :param path: The path to format
-    :type path: PathKey
+    :type path: DataPath
     :return: The formatted path string
     :rtype: str
     """

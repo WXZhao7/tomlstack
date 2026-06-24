@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from tomlstack import load
-from tomlstack.errors import IncludeCycleError, IncludeError
+from tomlstack.errors import IncludeCycleError, IncludeError, TomlFormatError
 
 
 def test_include_merge_order_and_current_override(tmp_path: Path) -> None:
@@ -61,9 +61,12 @@ def test_include_tree_preserves_occurrences_order_and_rendering(tmp_path: Path) 
     tree = load(main).include_tree
 
     assert tree.file.path == main.resolve()
-    assert [child.file.str_ for child in tree.children] == ["./a.toml", "./b.toml"]
-    assert tree.children[0].children[0].file.str_ == "./shared.toml"
-    assert tree.children[1].children[0].file.str_ == "./shared.toml"
+    assert [child.file.reference for child in tree.children] == [
+        "./a.toml",
+        "./b.toml",
+    ]
+    assert tree.children[0].children[0].file.reference == "./shared.toml"
+    assert tree.children[1].children[0].file.reference == "./shared.toml"
     assert tree.render() == "\n".join(
         [
             str(main),
@@ -99,7 +102,7 @@ def test_include_tree_records_anchor_reference_and_leaf(tmp_path: Path) -> None:
     tree = load(main).include_tree
 
     assert len(tree.children) == 1
-    assert tree.children[0].file.str_ == "@root/base.toml"
+    assert tree.children[0].file.reference == "@root/base.toml"
     assert tree.children[0].file.path == (shared / "base.toml").resolve()
     assert tree.children[0].children == ()
 
@@ -122,11 +125,11 @@ items = ['main-0']
     cfg = load(tmp_path / "main.toml")
 
     assert cfg["items"].raw == ["main-0"]
-    assert [hist.str_ for hist in cfg["items"].history] == [
+    assert [hist.reference for hist in cfg["items"].history] == [
         "./base.toml",
         str(tmp_path / "main.toml"),
     ]
-    assert [hist.str_ for hist in cfg["items"][0].history] == [
+    assert [hist.reference for hist in cfg["items"][0].history] == [
         str(tmp_path / "main.toml")
     ]
     with pytest.raises(IndexError):
@@ -152,7 +155,7 @@ value = 'main'
     cfg = load(tmp_path / "main.toml")
 
     assert cfg["value"].raw == "main"
-    assert [hist.str_ for hist in cfg["value"].history] == [
+    assert [hist.reference for hist in cfg["value"].history] == [
         "./base.toml",
         str(tmp_path / "main.toml"),
     ]
@@ -180,11 +183,11 @@ new = 'main'
 
     cfg = load(tmp_path / "main.toml")
 
-    assert [hist.str_ for hist in cfg["value"].history] == [
+    assert [hist.reference for hist in cfg["value"].history] == [
         "./base.toml",
         str(tmp_path / "main.toml"),
     ]
-    assert [hist.str_ for hist in cfg["value"]["new"].history] == [
+    assert [hist.reference for hist in cfg["value"]["new"].history] == [
         str(tmp_path / "main.toml")
     ]
 
@@ -228,22 +231,22 @@ port = 8080
             "port": 8080,
         }
     }
-    assert [item.str_ for item in cfg["service"].history] == [
+    assert [item.reference for item in cfg["service"].history] == [
         "./base.toml",
         "./overlay.toml",
         str(tmp_path / "main.toml"),
     ]
-    assert [item.str_ for item in cfg["service"]["host"].history] == [
+    assert [item.reference for item in cfg["service"]["host"].history] == [
         "./base.toml",
         "./overlay.toml",
     ]
-    assert [item.str_ for item in cfg["service"]["auth"]["user"].history] == [
+    assert [item.reference for item in cfg["service"]["auth"]["user"].history] == [
         "./base.toml"
     ]
-    assert [item.str_ for item in cfg["service"]["auth"]["password"].history] == [
+    assert [item.reference for item in cfg["service"]["auth"]["password"].history] == [
         "./overlay.toml"
     ]
-    assert [item.str_ for item in cfg["service"]["port"].history] == [
+    assert [item.reference for item in cfg["service"]["port"].history] == [
         str(tmp_path / "main.toml")
     ]
 
@@ -277,12 +280,12 @@ current = 'main'
     cfg = load(tmp_path / "main.toml")
 
     assert cfg["value"].raw == {"current": "main"}
-    assert [item.str_ for item in cfg["value"].history] == [
+    assert [item.reference for item in cfg["value"].history] == [
         "./base.toml",
         "./middle.toml",
         str(tmp_path / "main.toml"),
     ]
-    assert [item.str_ for item in cfg["value"]["current"].history] == [
+    assert [item.reference for item in cfg["value"]["current"].history] == [
         str(tmp_path / "main.toml")
     ]
     with pytest.raises(KeyError):
@@ -310,11 +313,11 @@ include = './base.toml'
     cfg = load(tmp_path / "main.toml")
 
     assert cfg["service"].raw == {"host": "base"}
-    assert [item.str_ for item in cfg["service"].history] == [
+    assert [item.reference for item in cfg["service"].history] == [
         "./base.toml",
         str(tmp_path / "main.toml"),
     ]
-    assert [item.str_ for item in cfg["service"]["host"].history] == [
+    assert [item.reference for item in cfg["service"]["host"].history] == [
         "./base.toml"
     ]
 
@@ -352,7 +355,7 @@ include = ['./a.toml', './b.toml']
     cfg = load(tmp_path / "main.toml")
 
     assert cfg.to_dict() == {"value": 1, "a": True, "b": True}
-    assert [item.str_ for item in cfg["value"].history] == [
+    assert [item.reference for item in cfg["value"].history] == [
         "./shared.toml",
         "./shared.toml",
     ]
@@ -419,6 +422,24 @@ def test_invalid_include_format_error(tmp_path: Path) -> None:
     with pytest.raises(
         IncludeError, match=r"Use ./ or ../ or @label/ or absolute path"
     ):
+        load(path)
+
+
+def test_invalid_anchor_path_raises_include_error(tmp_path: Path) -> None:
+    path = tmp_path / "main.toml"
+    path.write_text(
+        "[tomlstack.anchors]\nroot = 'shared'\n", encoding="utf-8"
+    )
+
+    with pytest.raises(IncludeError, match="Invalid anchor path"):
+        load(path)
+
+
+def test_invalid_toml_raises_toml_format_error(tmp_path: Path) -> None:
+    path = tmp_path / "main.toml"
+    path.write_text("x = [\n", encoding="utf-8")
+
+    with pytest.raises(TomlFormatError, match="Invalid TOML"):
         load(path)
 
 

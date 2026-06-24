@@ -4,7 +4,9 @@ import pytest
 
 from tomlstack import InterpolationDependency, ResolutionTrace, load
 from tomlstack.errors import (
+    InterpolationCycleError,
     InterpolationError,
+    InterpolationUndefinedError,
 )
 
 
@@ -51,8 +53,8 @@ target = '${source}'
 
     assert cfg["target"].raw == "${source}"
     assert cfg["target"].value == 42
-    assert cfg["target"].origin.str_ == str(tmp_path / "main.toml")
-    assert cfg["source"].origin.str_ == "./base.toml"
+    assert cfg["target"].origin.reference == str(tmp_path / "main.toml")
+    assert cfg["source"].origin.reference == "./base.toml"
 
 
 def test_replace_dependency_keeps_target_history_separate(tmp_path: Path) -> None:
@@ -70,7 +72,7 @@ target = '${source}'
     target = cfg["target"]
 
     assert target.value == 2
-    assert [item.str_ for item in target.history] == [str(tmp_path / "main.toml")]
+    assert [item.reference for item in target.history] == [str(tmp_path / "main.toml")]
     dependency = target.dependencies[0]
     assert isinstance(dependency, InterpolationDependency)
     assert dependency.target_path == ("target",)
@@ -78,7 +80,7 @@ target = '${source}'
     assert dependency.expression == "${source}"
     assert dependency.kind == "replace"
     assert dependency.format_spec is None
-    assert [item.str_ for item in dependency.source_history] == [
+    assert [item.reference for item in dependency.source_history] == [
         "./base.toml",
         "./prod.toml",
     ]
@@ -203,11 +205,11 @@ url = 'port=${port}'
     cfg = load(tmp_path / "main.toml")
 
     assert cfg["url"].value == "port=2000"
-    assert [item.str_ for item in cfg["port"].history] == [
+    assert [item.reference for item in cfg["port"].history] == [
         "./base.toml",
         "./prod.toml",
     ]
-    assert cfg["url"].origin.str_ == str(tmp_path / "main.toml")
+    assert cfg["url"].origin.reference == str(tmp_path / "main.toml")
 
 
 def test_full_interpolation_of_complex_values_does_not_alias_results(
@@ -266,7 +268,11 @@ x = '${missing.key}'
     )
 
     cfg = load(tmp_path / "main.toml")
-    with pytest.raises(InterpolationError):
+    with pytest.raises(InterpolationUndefinedError):
+        cfg.resolve()
+    assert cfg._resolution is None
+
+    with pytest.raises(InterpolationUndefinedError):
         cfg.resolve()
 
 
@@ -280,8 +286,17 @@ b = '${a}'
     )
 
     cfg = load(tmp_path / "main.toml")
-    with pytest.raises(InterpolationError):
+    with pytest.raises(InterpolationCycleError):
         cfg.resolve()
+
+
+def test_invalid_interpolation_path_raises_interpolation_error(tmp_path: Path) -> None:
+    (tmp_path / "main.toml").write_text(
+        "x = '${missing..key}'\n", encoding="utf-8"
+    )
+
+    with pytest.raises(InterpolationError, match="Invalid interpolation path"):
+        load(tmp_path / "main.toml").resolve()
 
 
 def test_embedded_interpolation_rejects_complex_type(tmp_path: Path) -> None:
@@ -297,5 +312,5 @@ x = "prefix-${db.apps}"
     )
 
     cfg = load(tmp_path / "main.toml")
-    with pytest.raises(InterpolationError, match="Failed to resolve"):
+    with pytest.raises(InterpolationError, match="Cannot format value of type list"):
         cfg.resolve()

@@ -32,7 +32,7 @@ class IncludeSpec:
             return Path(anchor_path).resolve()
         if cls._is_relative(anchor_path):
             return (ref_path / anchor_path).resolve()
-        raise ValueError(
+        raise IncludeError(
             f"Invalid anchor path: {anchor_path}. "
             "Anchor values must be absolute or start with ./ or ../"
         )
@@ -62,7 +62,8 @@ class IncludeSpec:
 
         for label, raw_value in raw_anchors.items():
             anchors[label] = TomlFile(
-                str_=raw_value, path=cls.resolve_anchor_path(ref_path, raw_value)
+                reference=raw_value,
+                path=cls.resolve_anchor_path(ref_path, raw_value),
             )
 
         return cls(file=file, anchors=anchors)

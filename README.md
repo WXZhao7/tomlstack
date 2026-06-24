@@ -9,7 +9,8 @@
 - node-level provenance (`origin`, `history`, `dependencies`)
 
 tomlstack does not try to be a configuration framework.
-It address two missing pieces to TOML: file composition and safe interpolation — while keeping files self-contained and explainable.
+It addresses two missing pieces in TOML: file composition and safe interpolation,
+while keeping files self-contained and explainable.
 
 ## Install
 
@@ -99,11 +100,16 @@ Conflict behavior:
 - path syntax supports dot and list index: `${db.apps[0]}`
 - full-string interpolation (`"${db.port}"`) keeps source type
 - embedded interpolation (`"postgres://${db.host}:${db.port}"`) allows only:
-- `str`, `int`, `float`, `date`, `time`, `datetime`
+  - `str`, `int`, `float`, `bool`, `date`, `time`, `datetime`
 - formatting syntax: `${path:spec}`
 - for `date/time/datetime`, formatting uses `strftime`
 - otherwise uses Python `format(value, spec)`
-- invalid paths, undefined references, and cycles raise `InterpolationError`
+- invalid interpolation syntax and formatting failures raise `InterpolationError`
+- undefined references raise `InterpolationUndefinedError`
+- interpolation cycles raise `InterpolationCycleError`
+
+Invalid TOML raises `TomlFormatError`; invalid include paths and anchors raise
+`IncludeError`.
 
 ## Public API
 
@@ -132,6 +138,8 @@ loaded configuration.
 History records definitions of the same data path from lowest to highest priority.
 When a list or value type is replaced, its old child paths are discarded. Resolving an
 interpolation does not change the history of the node containing the expression.
+Each history entry is a `TomlFile` with its raw `reference` and resolved absolute
+`path`.
 
 Dependencies describe interpolation separately from merge history. A full replacement
 such as `target = "${source}"` leaves `target.history` at the file that defined
