@@ -3,7 +3,12 @@ name: Publish PyPI
 on:
   push:
     tags:
-    - "v*"
+      # Final releases only.  Release candidates are routed to TestPyPI below.
+      - "v*"
+      - "!v*rc*"
+      - "!v*alpha*"
+      - "!v*beta*"
+      - "!v*dev*"
 
 jobs:
   publish:
@@ -11,7 +16,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: PyPI
     permissions:
-      contents: read
+      # Creating the GitHub Release and uploading dist/* both write repository
+      # contents.  id-token is used by PyPI trusted publishing.
+      contents: write
       id-token: write
 
     steps:
