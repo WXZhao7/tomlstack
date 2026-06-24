@@ -2,35 +2,28 @@ from __future__ import annotations
 
 import tomllib
 from contextlib import contextmanager
-from copy import deepcopy
 from dataclasses import dataclass, field
 from os import PathLike
 from pathlib import Path
 from typing import Any
 
-from .errors import ContentError, IncludeCycleError
-from .include import IncludeSpec
-from .types import (
-    CONFIG_TABLE,
-    ROOT_PATH,
-    DataPath,
-    TomlFile,
-    TomlHist,
-)
+from .errors import ContentError, IncludeCycleError, TomlFormatError
+from .include import _IncludeResolver
+from .tree import _DataNode, _DataNodeValue
+from .types import CONFIG_TABLE, IncludeNode, TomlFile
 
 
 @dataclass(frozen=True, slots=True)
-class ParsedToml:
-    metadata: dict[str, Any]
+class _ParsedToml:
     includes: list[str]
     anchors: dict[str, str]
     data: dict[str, Any]
 
 
-@dataclass
-class LoadResult:
-    data: dict[str, Any]
-    history: dict[DataPath, list[TomlHist]]
+@dataclass(frozen=True, slots=True)
+class _LoadedToml:
+    root: _DataNode
+    include_tree: IncludeNode
 
 
 @dataclass
@@ -38,17 +31,15 @@ class _LoadContext:
     file_stack: list[TomlFile] = field(default_factory=list)
     # current include stack for cycle detection
 
-    @property
-    def depth(self) -> int:
-        return len(self.file_stack)
-
     def _render_include_chain(self) -> str:
-        return "\n".join(f"\t{f.str_} -> {f.path}" for f in self.file_stack)
+        return "\n".join(
+            f"\t{file.reference} -> {file.path}" for file in self.file_stack
+        )
 
     @contextmanager
     def enter_file(self, entry: TomlFile):
         self._validate_cycle_include(entry)
-        toml = parse_raw_file(entry.path)
+        toml = _parse_raw_file(entry.path)
 
         self.file_stack.append(entry)
         try:
@@ -59,12 +50,12 @@ class _LoadContext:
     def _validate_cycle_include(self, entry: TomlFile) -> None:
 
         def render_cycle_include() -> str:
-            msg = f"Include cycle detected when load {self.file_stack[0].str_!r}\n"
-            for f in self.file_stack + [entry]:
-                if f.path == entry.path:
-                    msg += f"\t=> {f.str_} -> {f.path}\n"
+            msg = f"Include cycle detected when load {self.file_stack[0].reference!r}\n"
+            for file in self.file_stack + [entry]:
+                if file.path == entry.path:
+                    msg += f"\t=> {file.reference} -> {file.path}\n"
                 else:
-                    msg += f"\t   {f.str_} -> {f.path}\n"
+                    msg += f"\t   {file.reference} -> {file.path}\n"
             return msg
 
         for file in self.file_stack:
@@ -72,79 +63,64 @@ class _LoadContext:
                 raise IncludeCycleError(render_cycle_include())
 
 
-def load_toml_with_includes(root_file: str | PathLike[str]) -> LoadResult:
+def _load_toml_with_includes(
+    root_file: str | PathLike[str],
+) -> _LoadedToml:
     abs_path = Path(root_file).expanduser().resolve()
-    result = _load_file(TomlFile(str_=str(root_file), path=abs_path), _LoadContext())
-    return result
+    return _load_file(TomlFile(reference=str(root_file), path=abs_path), _LoadContext())
 
 
-def _load_file(entry: TomlFile, ctx: _LoadContext) -> LoadResult:
+def _load_file(entry: TomlFile, ctx: _LoadContext) -> _LoadedToml:
 
     with ctx.enter_file(entry) as toml:
-        current_data = toml.data
-        current_history = record_history(
-            toml.data, TomlHist(file=entry, depth=ctx.depth)
-        )
-        if not toml.includes:
-            return LoadResult(data=current_data, history=current_history)
+        current = _annotate(toml.data, entry)
         # Includes are merged in order; later includes override earlier ones.
         # The current file has the highest precedence.
-        include_spec = IncludeSpec.from_toml(entry, toml.anchors)
-        merged_data: dict[str, Any] = {}
-        merged_history: dict[DataPath, list[TomlHist]] = {}
+        include_resolver = _IncludeResolver.from_toml(entry, toml.anchors)
+        merged = _DataNode(value={}, history=())
+        children: list[IncludeNode] = []
         for raw_path in toml.includes:
-            abs_path = include_spec.resolve_include_path(raw_path)
-            included = _load_file(TomlFile(str_=raw_path, path=abs_path), ctx)
-            merged_data = merge_data(merged_data, included.data)
-            merged_history = merge_history(merged_history, included.history)
-        merged_data = merge_data(merged_data, current_data)
-        merged_history = merge_history(merged_history, current_history)
-        return LoadResult(data=merged_data, history=merged_history)
+            abs_path = include_resolver.resolve_include_path(raw_path)
+            included = _load_file(TomlFile(reference=raw_path, path=abs_path), ctx)
+            merged = _merge_nodes(merged, included.root)
+            children.append(included.include_tree)
+        return _LoadedToml(
+            root=_merge_nodes(merged, current),
+            include_tree=IncludeNode(file=entry, children=tuple(children)),
+        )
 
 
-def record_history(data: Any, hist: TomlHist):
-    history: dict[DataPath, list[TomlHist]] = {}
-
-    def walk(value: Any, path: DataPath) -> None:
-        history.setdefault(path, []).append(hist)
-        if isinstance(value, dict):
-            for key, child in value.items():
-                walk(child, (*path, key))
-        elif isinstance(value, list):
-            for idx, child in enumerate(value):
-                walk(child, (*path, idx))
-
-    walk(data, ROOT_PATH)
-    return history
+def _annotate(value: Any, file: TomlFile) -> _DataNode:
+    annotated: _DataNodeValue
+    if isinstance(value, dict):
+        annotated = {key: _annotate(child, file) for key, child in value.items()}
+    elif isinstance(value, list):
+        annotated = [_annotate(child, file) for child in value]
+    else:
+        annotated = value
+    return _DataNode(value=annotated, history=(file,))
 
 
-def merge_data(low: dict[str, Any], high: dict[str, Any]) -> dict[str, Any]:
-    """Merge two dictionaries with high priority overriding low priority."""
-    result: dict[str, Any] = deepcopy(low)
-    for key, high_value in high.items():
-        if (
-            key in result
-            and isinstance(result[key], dict)
-            and isinstance(high_value, dict)
-        ):
-            result[key] = merge_data(result[key], high_value)
-        else:
-            result[key] = deepcopy(high_value)
-    return result
+def _merge_nodes(low: _DataNode, high: _DataNode) -> _DataNode:
+    """Merge two nodes with high priority overriding low priority."""
+    history = low.history + high.history
+    if isinstance(low.value, dict) and isinstance(high.value, dict):
+        merged = dict(low.value)
+        for key, high_child in high.value.items():
+            if key in merged:
+                merged[key] = _merge_nodes(merged[key], high_child)
+            else:
+                merged[key] = high_child
+        return _DataNode(value=merged, history=history)
+    return _DataNode(value=high.value, history=history)
 
 
-def merge_history(
-    low: dict[DataPath, list[TomlHist]], high: dict[DataPath, list[TomlHist]]
-) -> dict[DataPath, list[TomlHist]]:
-    merged = {path: entries[:] for path, entries in low.items()}  # !!! important?
-    for path, entries in high.items():
-        merged.setdefault(path, []).extend(entries)
-    return merged
-
-
-def parse_raw_file(path: Path) -> ParsedToml:
-    with path.open("rb") as f:
-        data = tomllib.load(f)
+def _parse_raw_file(path: Path) -> _ParsedToml:
+    try:
+        with path.open("rb") as f:
+            data = tomllib.load(f)
+    except tomllib.TOMLDecodeError as exc:
+        raise TomlFormatError(f"Invalid TOML in {path}") from exc
 
     metadata = data.pop(CONFIG_TABLE, {})
     if not isinstance(metadata, dict):
@@ -177,4 +153,4 @@ def parse_raw_file(path: Path) -> ParsedToml:
     else:
         raise ContentError(f"Invalid anchors specification in {path}")
 
-    return ParsedToml(metadata=metadata, includes=includes, anchors=anchors, data=data)
+    return _ParsedToml(includes=includes, anchors=anchors, data=data)

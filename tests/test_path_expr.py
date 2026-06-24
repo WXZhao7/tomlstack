@@ -1,7 +1,7 @@
 import pytest
 
 from tomlstack.errors import DataPathError
-from tomlstack.path_expr import parse_path_expr_match, parse_path_expr_scan
+from tomlstack.path_expr import parse_path_expr_match
 
 
 @pytest.mark.parametrize(
@@ -38,21 +38,6 @@ def test_parse_path_expr_re_valid(expr: str, expected: tuple[str | int, ...]) ->
 def test_parse_path_expr_re_invalid(expr: str) -> None:
     with pytest.raises(DataPathError):
         parse_path_expr_match(expr)
-
-
-@pytest.mark.parametrize(
-    "expr",
-    [
-        "a",
-        "a.b.c",
-        "a.b.c[1]",
-        "a.b[1][2]",
-        "a[0][1].b",
-        "db.apps[0]",
-    ],
-)
-def test_parse_path_expr_re_matches_original_on_supported_inputs(expr: str) -> None:
-    assert parse_path_expr_match(expr) == parse_path_expr_scan(expr)
 
 
 @pytest.mark.parametrize(

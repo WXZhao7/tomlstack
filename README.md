@@ -3,12 +3,14 @@
 `tomlstack` is a lightweight TOML config loader for Python 3.11+ with:
 
 - top-level `include` loading
+- include-tree inspection with raw and resolved paths
 - deterministic merge by include order
 - `${path}` interpolation with cycle/undefined checks
-- node-level provenance (`origin`, `explain`, `history`)
+- node-level provenance (`origin`, `history`, `dependencies`)
 
 tomlstack does not try to be a configuration framework.
-It address two missing pieces to TOML: file composition and safe interpolation — while keeping files self-contained and explainable.
+It addresses two missing pieces in TOML: file composition and safe interpolation,
+while keeping files self-contained and explainable.
 
 ## Install
 
@@ -43,15 +45,17 @@ port = 5432
 Python:
 
 ```python
-from tomlstack import load
+from tomlstack import TomlNode, load
 
 cfg = load("main.toml")
 print(cfg["db"]["url"].raw)    # raw interpolation string
-cfg.resolve()
 print(cfg["db"]["url"].value)  # resolved value
 print(cfg["db"]["url"].origin)
 print(cfg["db"]["url"].history)
-print(cfg.to_dict())
+print(cfg["db"]["url"].dependencies)
+print(cfg["db"]["url"].explain())
+print(cfg.raw)                   # raw configuration snapshot
+print(cfg.to_dict())             # resolved configuration snapshot
 ```
 
 ## Include Semantics
@@ -59,28 +63,20 @@ print(cfg.to_dict())
 - top-level `include` only; nested `include` is treated as normal data
 - syntax: string or list of strings
 - valid include path forms:
-- `./...` or `../...`
-- `@label/...` (label from `tomlstack.include.anchors`)
-- absolute path
-- any other form raises error with hint: `Use ./ or ../ or @label/`
+  - `./...` or `../...`
+  - `@label/...` (label from `tomlstack.anchors`)
+  - absolute path
+- any other form raises an error with a path-format hint
 
 ### Meta Include Directives
 
 ```toml
-[tomlstack]
-version = 1
-
-[tomlstack.include]
-root = "../.."
-
-[tomlstack.include.anchors]
+[tomlstack.anchors]
 proj = "./shared"
 ```
 
-- `tomlstack.include.root` is sugar for `anchors.root`
-- if both `root` and `anchors.root` exist and resolve differently, error
-- anchor/root path values must be absolute or start with `./` or `../`
-- if any file explicitly sets `tomlstack.version`, all files in include chain must share one supported version (`1`)
+- anchors are local to the file that declares them
+- anchor path values must be absolute or start with `./` or `../`
 
 ## Merge Rules
 
@@ -99,40 +95,61 @@ Conflict behavior:
 
 ## Interpolation Semantics
 
-- interpolation happens on `cfg.resolve()`
+- interpolation is resolved lazily by `cfg.resolve()`, `cfg.to_dict()`, or
+  `node.value`
 - path syntax supports dot and list index: `${db.apps[0]}`
 - full-string interpolation (`"${db.port}"`) keeps source type
 - embedded interpolation (`"postgres://${db.host}:${db.port}"`) allows only:
-- `str`, `int`, `float`, `date`, `time`, `datetime`
+  - `str`, `int`, `float`, `bool`, `date`, `time`, `datetime`
 - formatting syntax: `${path:spec}`
 - for `date/time/datetime`, formatting uses `strftime`
 - otherwise uses Python `format(value, spec)`
-- undefined reference raises `InterpolationUndefinedError`
-- interpolation cycle raises `InterpolationCycleError`
+- invalid interpolation syntax and formatting failures raise `InterpolationError`
+- undefined references raise `InterpolationUndefinedError`
+- interpolation cycles raise `InterpolationCycleError`
+
+Invalid TOML raises `TomlFormatError`; invalid include paths and anchors raise
+`IncludeError`.
 
 ## Public API
 
 - `cfg = load("f.toml")`
+- `cfg.raw` — raw configuration snapshot
 - `cfg.resolve()`
-- `cfg.to_dict()`
-- `node = cfg["proj"][0]["path"]["foo"]`
+- `cfg.to_dict()` — resolved configuration snapshot
+- `cfg.include_tree` — `IncludeNode` load-occurrence tree
+- `cfg.include_tree.render()` — render raw include references
+- `cfg.include_tree.render(absolute=True)` — include references with resolved paths
+- `node: TomlNode = cfg["proj"][0]["path"]["foo"]`
 - `node.raw`
 - `node.value`
 - `node.origin`
 - `node.history`
+- `node.dependencies` — direct interpolation dependencies
+- `node.explain()` — transitive interpolation trace
 - `node.preview()`
 - `cfg.to_toml()` -> `NotImplementedError`
+
+`cfg.raw`, `cfg.to_dict()`, `node.raw`, and `node.value` return independent data
+snapshots; mutating their dictionaries or lists does not modify the loaded
+configuration. `TomlNode` instances are created by configuration navigation and are
+not constructed directly.
+
+History records definitions of the same data path from lowest to highest priority.
+When a list or value type is replaced, its old child paths are discarded. Resolving an
+interpolation does not change the history of the node containing the expression.
+Each history entry is a `TomlFile` with its raw `reference` and resolved absolute
+`path`.
+
+Dependencies describe interpolation separately from merge history. A full replacement
+such as `target = "${source}"` leaves `target.history` at the file that defined
+`target`, while `target.dependencies` records the source path and its history.
 
 ## Current Limitations
 
 - interpolation path parser supports unquoted dot keys and numeric list indices
 - no nested interpolation expressions
 - `to_toml()` is not implemented yet
-
-## TODO
-
-- [ ] review the details of interpolation
-- [ ] explain history with interpolation
 
 ## Release To PyPI
 

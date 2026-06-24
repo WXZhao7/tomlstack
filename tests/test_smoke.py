@@ -1,6 +1,8 @@
 from pathlib import Path
 
-from tomlstack import load
+import pytest
+
+from tomlstack import TomlStack, load
 
 
 def test_load_returns_config(tmp_path: Path) -> None:
@@ -22,3 +24,8 @@ def test_to_toml_not_implemented(tmp_path: Path) -> None:
         pass
     else:
         raise AssertionError("Expected NotImplementedError")
+
+
+def test_toml_stack_cannot_be_constructed_directly() -> None:
+    with pytest.raises(TypeError, match="created by load"):
+        TomlStack()

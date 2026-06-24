@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Self
 
@@ -7,9 +7,9 @@ from .types import TomlFile
 
 
 @dataclass
-class IncludeSpec:
-    file: TomlFile  # parent dir of current.toml
-    anchors: dict[str, TomlFile] = field(default_factory=dict)
+class _IncludeResolver:
+    including_file: TomlFile
+    anchor_roots: dict[str, Path]
 
     @staticmethod
     def _is_relative(path: str) -> bool:
@@ -27,12 +27,12 @@ class IncludeSpec:
         return bool(label and sep and value)
 
     @classmethod
-    def resolve_anchor_path(cls, ref_path: Path, anchor_path: str) -> Path:
+    def resolve_anchor_path(cls, base_dir: Path, anchor_path: str) -> Path:
         if cls._is_absolute(anchor_path):
             return Path(anchor_path).resolve()
         if cls._is_relative(anchor_path):
-            return (ref_path / anchor_path).resolve()
-        raise ValueError(
+            return (base_dir / anchor_path).resolve()
+        raise IncludeError(
             f"Invalid anchor path: {anchor_path}. "
             "Anchor values must be absolute or start with ./ or ../"
         )
@@ -42,13 +42,13 @@ class IncludeSpec:
             return Path(include_path).resolve()
 
         if self._is_relative(include_path):
-            return (self.file.path.parent / include_path).resolve()
+            return (self.including_file.path.parent / include_path).resolve()
 
         if self._is_anchor_path(include_path):
             label, _, rest = include_path[1:].partition("/")
-            if label not in self.anchors:
+            if label not in self.anchor_roots:
                 raise IncludeError(f"Undefined include anchor: {label}")
-            return (self.anchors[label].path / rest).resolve()
+            return (self.anchor_roots[label] / rest).resolve()
 
         raise IncludeError(
             f"Invalid include path format: {include_path}. "
@@ -57,12 +57,10 @@ class IncludeSpec:
 
     @classmethod
     def from_toml(cls, file: TomlFile, raw_anchors: dict[str, str]) -> Self:
-        anchors: dict[str, TomlFile] = {}
-        ref_path = file.path.parent
+        anchor_roots: dict[str, Path] = {}
+        base_dir = file.path.parent
 
         for label, raw_value in raw_anchors.items():
-            anchors[label] = TomlFile(
-                str_=raw_value, path=cls.resolve_anchor_path(ref_path, raw_value)
-            )
+            anchor_roots[label] = cls.resolve_anchor_path(base_dir, raw_value)
 
-        return cls(file=file, anchors=anchors)
+        return cls(including_file=file, anchor_roots=anchor_roots)

@@ -1,16 +1,26 @@
 from __future__ import annotations
 
 import re
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import date, datetime, time
 from typing import Any
 
 from .errors import (
+    DataPathError,
     InterpolationCycleError,
     InterpolationError,
+    InterpolationUndefinedError,
 )
-from .path_expr import format_path_expr, get_by_path, parse_path_expr
-from .types import ROOT_PATH, DataPath
+from .path_expr import format_path_expr, parse_path_expr
+from .tree import _DataNode
+from .types import (
+    ROOT_PATH,
+    DataPath,
+    InterpolationDependency,
+    InterpolationKind,
+    TomlFile,
+)
 
 EXPR_RE = re.compile(r"\$\{([^{}]+)\}")
 ALLOWED_EMBED_TYPES = (str, int, float, bool, date, time, datetime)
@@ -19,33 +29,74 @@ ALLOWED_EMBED_TYPES_STR = ", ".join(t.__name__ for t in ALLOWED_EMBED_TYPES)
 
 @dataclass
 class _InterpolationState:
-    raw_data: dict[str, Any]
+    raw_root: _DataNode
     resolved_cache: dict[DataPath, Any]
     resolving_stack: list[DataPath]
+    direct_dependencies: dict[DataPath, list[InterpolationDependency]]
 
 
-def resolve_interpolations(raw_data: dict[str, Any]) -> dict[str, Any]:
+@dataclass(frozen=True, slots=True)
+class _ResolutionResult:
+    data: dict[str, Any]
+    direct_dependencies: dict[DataPath, tuple[InterpolationDependency, ...]]
+
+
+def _resolve_interpolations(raw_root: _DataNode) -> _ResolutionResult:
     state = _InterpolationState(
-        raw_data=raw_data, resolved_cache={}, resolving_stack=[]
+        raw_root=raw_root,
+        resolved_cache={},
+        resolving_stack=[],
+        direct_dependencies={},
     )
-    return _resolve_node(raw_data, ROOT_PATH, state)
+    resolved = _resolve_node(raw_root, ROOT_PATH, state)
+    assert isinstance(resolved, dict)
+    direct_dependencies = {
+        path: tuple(dependencies)
+        for path, dependencies in state.direct_dependencies.items()
+    }
+    return _ResolutionResult(data=resolved, direct_dependencies=direct_dependencies)
 
 
-def _resolve_node(node: Any, path: DataPath, state: _InterpolationState) -> Any:
+def _resolve_node(node: _DataNode, path: DataPath, state: _InterpolationState) -> Any:
     """Recursively resolve interpolations in a value"""
-    if isinstance(node, dict):
-        return {k: _resolve_node(v, (*path, k), state) for k, v in node.items()}
-    if isinstance(node, list):
-        return [_resolve_node(v, (*path, i), state) for i, v in enumerate(node)]
-    if isinstance(node, str):
-        try:
-            return _resolve_string(node, state)
-        except Exception as e:
-            raise InterpolationError(f"Failed to resolve {node!r}") from e
-    return node
+    if path in state.resolved_cache:
+        return deepcopy(state.resolved_cache[path])
+
+    if path in state.resolving_stack:
+        chain = " -> ".join(format_path_expr(p) for p in [*state.resolving_stack, path])
+        raise InterpolationCycleError(f"Interpolation cycle detected: {chain}")
+
+    state.resolving_stack.append(path)
+    try:
+        resolved: Any
+        if isinstance(node.value, dict):
+            resolved = {
+                key: _resolve_node(child, (*path, key), state)
+                for key, child in node.value.items()
+            }
+        elif isinstance(node.value, list):
+            resolved = [
+                _resolve_node(child, (*path, index), state)
+                for index, child in enumerate(node.value)
+            ]
+        elif isinstance(node.value, str):
+            try:
+                resolved = _resolve_string(node.value, path, state)
+            except InterpolationError:
+                raise
+            except Exception as exc:
+                raise InterpolationError(f"Failed to resolve {node.value!r}") from exc
+        else:
+            resolved = node.value
+        state.resolved_cache[path] = resolved
+        return deepcopy(resolved)
+    finally:
+        state.resolving_stack.pop()
 
 
-def _resolve_string(str_expr: str, state: _InterpolationState) -> Any:
+def _resolve_string(
+    str_expr: str, target_path: DataPath, state: _InterpolationState
+) -> Any:
     """
     Resolve interpolations in a string value.
 
@@ -75,7 +126,15 @@ def _resolve_string(str_expr: str, state: _InterpolationState) -> Any:
     if len(matches) == 1 and matches[0].span() == (0, len(str_expr)):
         interpolation = matches[0].group(1)
         path_expr, fmt_sep, fmt_spec = interpolation.partition(":")
-        resolved_value = _resolve_path_expr(path_expr, state)
+        kind: InterpolationKind = "format" if fmt_sep else "replace"
+        resolved_value = _resolve_path_expr(
+            path_expr,
+            target_path,
+            matches[0].group(0),
+            kind,
+            fmt_spec if fmt_sep else None,
+            state,
+        )
         if fmt_sep:
             return _format_value(resolved_value, fmt_spec)
         return resolved_value
@@ -92,7 +151,14 @@ def _resolve_string(str_expr: str, state: _InterpolationState) -> Any:
 
         interpolation = match.group(1)
         path_expr, _, fmt_spec = interpolation.partition(":")
-        resolved_value = _resolve_path_expr(path_expr, state)
+        resolved_value = _resolve_path_expr(
+            path_expr,
+            target_path,
+            match.group(0),
+            "embed",
+            fmt_spec or None,
+            state,
+        )
         parts.append(_format_value(resolved_value, fmt_spec))
 
         last = end
@@ -101,25 +167,58 @@ def _resolve_string(str_expr: str, state: _InterpolationState) -> Any:
     return "".join(parts)
 
 
-def _resolve_path_expr(path_expr: str, state: _InterpolationState) -> Any:
-    path = parse_path_expr(path_expr)
-
-    if path in state.resolved_cache:
-        return state.resolved_cache[path]
-
-    if path in state.resolving_stack:
-        chain = " -> ".join(format_path_expr(p) for p in [*state.resolving_stack, path])
-        raise InterpolationCycleError(f"Interpolation cycle detected: {chain}")
-
-    state.resolving_stack.append(path)
+def _resolve_path_expr(
+    path_expr: str,
+    target_path: DataPath,
+    expression: str,
+    kind: InterpolationKind,
+    format_spec: str | None,
+    state: _InterpolationState,
+) -> Any:
+    try:
+        path = parse_path_expr(path_expr)
+    except DataPathError as exc:
+        raise InterpolationError(
+            f"Invalid interpolation path {path_expr!r} in {expression!r}"
+        ) from exc
 
     try:
-        raw_value = get_by_path(state.raw_data, path)
-        resolved = _resolve_node(raw_value, path, state)
-        state.resolved_cache[path] = resolved
-        return resolved
-    finally:
-        state.resolving_stack.pop()
+        raw_node = state.raw_root._get_subnode(path)
+    except (KeyError, IndexError) as exc:
+        raise InterpolationUndefinedError(
+            f"Undefined interpolation source {path_expr!r} in {expression!r}"
+        ) from exc
+    _record_dependency(
+        target_path,
+        path,
+        expression,
+        kind,
+        format_spec,
+        raw_node.history,
+        state,
+    )
+    return _resolve_node(raw_node, path, state)
+
+
+def _record_dependency(
+    target_path: DataPath,
+    source_path: DataPath,
+    expression: str,
+    kind: InterpolationKind,
+    format_spec: str | None,
+    source_history: tuple[TomlFile, ...],
+    state: _InterpolationState,
+) -> None:
+    state.direct_dependencies.setdefault(target_path, []).append(
+        InterpolationDependency(
+            target_path=target_path,
+            source_path=source_path,
+            expression=expression,
+            kind=kind,
+            format_spec=format_spec,
+            source_history=source_history,
+        )
+    )
 
 
 def _format_value(value: Any, fmt_spec: str) -> str:
